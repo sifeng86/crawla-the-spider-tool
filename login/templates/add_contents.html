@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html>
+    <head>
+
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Add Contents</title>
+
+        <!-- font awesome from BootstrapCDN -->
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/css/bootstrap.min.css"
+        integrity="sha384-B0vP5xmATw1+K9KRQjQERJvTumQW0nPEzvF6L/Z6nronJ3oUOFUFpCjEUQouq2+l" crossorigin="anonymous">
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.15.3/css/fontawesome.min.css"
+        integrity="sha384-wESLQ85D6gbsF459vf1CiZ2+rr+CsxRY0RpiF1tLlQpDnAgg6rwdsUF1+Ics2bni" crossorigin="anonymous">
+      <style>
+        .bd-example {
+            position: relative;
+            padding: 1rem;
+            margin: 1rem -15px 0;
+            border: solid #f8f9fa;
+            border-width: .2rem 0 0;
+        }
+      </style>
+      </style>
+    
+    </head>
+    <body>
+      <div style="position: absolute; top: 0; right: 0;"><a href="{{ url_for('logout') }}">logout</a></div>
+      <div><img style="margin: 30px 20px;" src="{{ url_for('static', filename='img/header-logo-small.png') }}"> </div>
+      <div class="p-3 rounded shadow-sm">
+        
+        <form name="contents" action="{{ url_for('contents') }}" method="post">
+          <div class="form-row">
+            <div class="form-group col-md-4">
+              <label for="task_name">Task Name:</label>
+              <input type="text" class="form-control" id="task_name" name="task_name" placeholder="eg: Momo product 1" required>
+              <input type="hidden" id="f_token" name="token" value="{{formtoken}}">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group col-md-4">
+              <label for="url">Notification Email:</label>
+              <input type="email" class="form-control" name="noti_email" id="noti_email" value="{{userinfo['email']}}" aria-describedby="emailHelp" required>
+              <small id="emailHelp" class="form-text text-muted">We'll never share your email with anyone else.</small>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group col-md-4">
+              <label for="url">Url:</label>
+              <input type="url" class="form-control" name="url" id="url" aria-describedby="urlHelp"
+                placeholder="eg: https://www.momoshop.com.tw/" required>
+              <small id="emailHelp" class="form-text text-muted">Your target url.</small>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group col-md-4">
+              <label>Method:</label>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="c_method" id="py_requests" value="py_requests" aria-describedby="reHelp" checked>
+                  <label class="form-check-label" for="py_requests">
+                    Request (<a href="https://www.crummy.com/software/BeautifulSoup/bs4/doc/" target="_blank">reference</a>)
+                  </label>
+                <small id="reHelp" class="form-text text-muted">[Fast] pure html parser, no javascript rendering in DOM (Static).</small>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="c_method" id="py_selenium" value="py_selenium"  aria-describedby="seHelp">
+                  
+                  <label class="form-check-label" for="py_selenium">
+                    Selenium (<a href="https://selenium-python.readthedocs.io/" target="_blank">reference</a>)
+                  </label>
+                  <small id="seHelp" class="form-text text-muted">[Slow] javascript behavior in the rendering (Dynamic).</small>
+                </div>
+            </div>
+          </div>
+          <div id="default-row">
+            <div class="form-row">
+              <div class="form-group col-md-3">
+                <label for="steps">Steps:</label>
+                <select id="steps" class="form-control steps" name="steps[]" required>
+                  <option selected value="">Choose...</option>
+                  <option value="select_one">BS4 - select one (use css)</option>
+                  <option value="select_all">BS4 - select all (use css)</option>
+                  <option value="find_element_by_id">BS4 - find one by id (no # required)</option>
+                  <option value="find_elements_by_id">BS4 - find all by id (no # required)</option>
+                  <option value="find_element_by_class">BS4 - find one by class (no . required)</option>
+                  <option value="find_elements_by_class">BS4 - find all by class (no . required)</option>
+                  <option value="ext_str_get_text">BS4 - get_text()</option>
+                </select>
+              </div>
+              <div class="form-group col-md-3">
+                <label for="args">Arguments:</label><small class="text-muted">eg: #price > li , (give - if no argument)</small>
+                <input type="text" name="args[]" class="form-control args" id="args" value="-" placeholder="give - if no argument" required>
+              </div>
+              <div class="form-group col-md-1">
+                <label for="more1" style="color: transparent;">More:</label>
+                <button type="button" class="form-control btn btn-info" id="more1">+</button>
+              </div>
+            </div>
+          </div>
+          <div id="new-row"></div>
+          <button type="submit" id="save" class="btn btn-primary">Save</button>
+          <button type="button" id="preview" class="btn btn-success" disabled>Preview</button>
+          {% if error %}
+          <p class="msgs" style="color:rgb(243, 52, 19);"><strong>Error: </strong> {{ error }}
+            {% elif request.args.get('msg')=='success' %}
+          <p class="msgs" style="color:rgb(6, 167, 6);"><strong>Success:</strong>  Task is inserted!
+            {% elif request.args.get('msg')=='deleted' %}
+          <p class="msgs" style="color:rgb(6, 167, 6);"><strong>Success:</strong> Task is deleted!
+          {% endif %}
+          <p id="result" style="margin-top: 30px;"></p>
+        </form>
+      </div>
+
+      <div style="margin: 30px 0 30px 0;">
+        <table class="table table-hover table-dark">
+          <thead class="thead-light" style="background-color: #CDF27E;">
+            <tr>
+              <th scope="col">#</th>
+              <th scope="col">Task Name</th>
+              <th scope="col">Url</th>
+              <th scope="col">Download</th>
+              <th scope="col"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% if records %}
+              {% for i in records %}
+              <tr>
+                <th scope="row">{{loop.index}}</th>
+                <td>{{i.task_name}}</td>
+                <td><a href="{{i.url}}" target="_blank">{{i.url}}</a></td>
+                <td><a href="{{ url_for('dw_csv', tid=i.task_id) }}">file</a></td>
+                <td><a href="{{ url_for('del_contents', tid=i.task_id) }}"><img src="{{ url_for('static', filename='img/del.png') }}"></a></td>
+              </tr>
+              {% endfor %}
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+     
+    </body>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"
+      integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-Piv4xVNRyMGpqkS2by6br4gNJ7DXjqk09RmUpJ8jgGtD7zP9yug3goQfGII0yAns"
+        crossorigin="anonymous"></script>
+    <script type="text/javascript">
+      // add row
+      $('#more1').click(function () {
+          var html = '';
+          html += '<div id="newRow" class="form-row">';
+          html += '<div class="form-group col-md-3">';
+          html += '<select id="steps" class="form-control steps" name="steps[]" required>';
+          html += '</select>';
+          html += '</div>';
+          html += '<div class="form-group col-md-3">';
+          html += '<input type="text" name="args[]" class="form-control args" id="args" value="-" placeholder="give - if no argument" required>';
+          html += '</div>';
+          html += '<div class="form-group col-md-1">';
+          html += '<button type="button" class="form-control btn btn-danger" id="rm1">remove</button>';
+          html += '</div>';
+          html += '</div>';
+
+          $('#new-row').append(html);
+          var method = $('input[type=radio]:checked').val();
+          console.log(method)
+          var newhtml = pymethod(method);
+          
+          $("#new-row #steps").last().html(newhtml);
+      });
+
+      // remove row
+      $(document).on('click', '#rm1', function () {
+          $(this).closest('#newRow').remove();
+      });
+
+      function pymethod(method) {
+          var newhtml = '';
+          if (method == 'py_requests') {
+            newhtml += '<option selected value="">Choose...</option>';
+            newhtml += '<option value="select_one">BS4 - select one (use css)</option>';
+            newhtml += '<option value="select_all">BS4 - select all (use css)</option>';
+            newhtml += '<option value="find_element_by_id">BS4 - find one by id (no # required)</option>';
+            newhtml += '<option value="find_elements_by_id">BS4 - find all by id (no # required)</option>';
+            newhtml += '<option value="find_element_by_class">BS4 - find one by class (no . required)</option>';
+            newhtml += '<option value="find_elements_by_class">BS4 - find all by class (no . required)</option>';
+            newhtml += '<option value="ext_str_get_text">BS4 - get_text()</option>';
+          } else {
+            newhtml += '<option selected value="">Choose...</option>';
+            newhtml += '<option value="find_element_by_id">selenium - find one by id (no # required)</option>';
+            newhtml += '<option value="find_elements_by_id">selenium - find all by id (no # required)</option>';
+            newhtml += '<option value="find_element_by_class">selenium - find one by class (no . required)</option>';
+            newhtml += '<option value="find_elements_by_class">selenium - find all by class (no . required)</option>';
+            newhtml += '<option value="find_element_by_css_selector">selenium - find one(css_selector)</option>';
+            newhtml += '<option value="find_elements_by_css_selector">selenium - find all(css_selector)</option>';
+            newhtml += '<option value="click">selenium - click()</option>';
+            newhtml += '<option value="ext_str_get_text">selenium - .text</option>';
+            newhtml += '<option value="ext_str_get_attribute">selenium - get_attribute()</option>';
+          }
+          return newhtml;
+      }
+
+      $('input[type=radio]').change(function () {
+          var method = $(this).val();
+          var newhtml = pymethod(method);
+          $('select').html(newhtml);
+      });
+
+      $('#url').change(function () {
+          var url = $(this).val();
+          if (url.includes("http",0)) {
+            $('#preview').removeAttr('disabled');
+            setTimeout(() => {
+              var params = {
+                "url": url,
+                "preview_id": $('#f_token').val()
+              };
+              $.ajax("{{ url_for('temphtml') }}", {
+                type: 'POST',
+                data: JSON.stringify(params),
+                contentType: 'application/json; charset=utf-8',
+                success: function (data, status, xhr) {
+                },
+                error: function (jqXhr, textStatus, errorMessage) {
+                }
+              });
+             console.log(params);
+            }, 1000);
+          }
+      });
+
+      $('#preview').click(function () {
+          $(this).prop('disabled', true);
+          $('#result').empty();
+          $('.msgs').empty();
+          $('#result').append('<img src='+"{{url_for('static', filename='img/loading_line.gif')}}"+'>');
+          var steps = [];
+          var args = [];
+          $.each($('.steps'), function (index, val) {
+            console.log(val.value);
+            steps.push(val.value);
+          });
+          $.each($('.args'), function (index, val) {
+            console.log(val.value);
+            args.push(val.value);
+          });
+          var params = {
+            "steps": steps,
+            "args": args,
+            "preview_id": $('#f_token').val(),
+            "c_method": $('input[name=c_method]:checked').val(),
+          };
+          $.ajax("{{ url_for('preview') }}", {
+            type: 'POST',
+            data: JSON.stringify(params),
+            contentType: 'application/json; charset=utf-8',
+            success: function (data, status, xhr) {
+              $('#result').empty();
+              $('#result').append('<strong>Result: </strong><span style="color:#59A52C;">' + data + '</span>');
+              $('#preview').removeAttr('disabled');
+            },
+            error: function (jqXhr, textStatus, errorMessage) {
+              $('#result').empty();
+              if (errorMessage == "INTERNAL SERVER ERROR") {
+                errorMessage = "Page timeout. Please refresh this page"
+              }
+              $('#result').append('<strong style="color:rgb(243, 52, 19);">Error: </strong>' + errorMessage);
+              $('#preview').removeAttr('disabled');
+            }
+          });
+          console.log(params);
+      });
+
+    </script>
+</html>

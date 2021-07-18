@@ -1,0 +1,13 @@
+{
+    "host_url": "www.example.com",
+    "mongo_mode": "atlas or local (either one)",
+    "atlas_host": "cluster900.abcde.mongodb.net",
+    "atlas_db": "example",
+    "atlas_user": "hehe",
+    "atlas_pw": "gABCDE(must use encryption)",
+    "mail_host": "smtp.sendgrid.net",
+    "mail_port": 465,
+    "mail_sender": "me@example.com",
+    "mail_user":"apikey",
+    "mail_pw": "gAA(must use encryption)"
+}

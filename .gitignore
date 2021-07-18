@@ -1,0 +1,12 @@
+*.env
+*.key
+*.pyc
+*.csv
+*.iml
+.directory
+.idea
+config.json
+__pycache__
+downloads/
+_-_-_backup/
+crawler/
