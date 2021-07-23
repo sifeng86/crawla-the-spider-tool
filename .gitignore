@@ -3,6 +3,8 @@
 *.pyc
 *.csv
 *.iml
+*.log
+screenshot.png
 .directory
 .idea
 config.json
