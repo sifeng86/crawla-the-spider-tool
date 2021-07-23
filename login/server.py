@@ -1,7 +1,7 @@
 """Python Flask WebApp Auth0 integration
 """
 from functools import wraps
-import json
+import json, sys
 import random
 import time, dateparser ,datetime
 import subprocess, os
@@ -20,6 +20,7 @@ from flask import send_from_directory
 from authlib.integrations.flask_client import OAuth
 from six.moves.urllib.parse import urlencode
 from lib.mongo import mongoHelper
+from celery_task1 import crawl, export_csv, send_email
 
 import constants
 
@@ -86,8 +87,7 @@ def home():
 
 @app.route('/callback')
 def callback_handling():
-    abc = auth0.authorize_access_token()
-    print('Atoken', abc)
+    auth0.authorize_access_token()
     resp = auth0.get('userinfo')
     userinfo = resp.json()
 
@@ -98,7 +98,6 @@ def callback_handling():
         'email': userinfo['email'],
         'picture': userinfo['picture']
     }
-    session['preview_limit'] = 0
     return redirect(url_for('contents'))
 
 
@@ -133,12 +132,11 @@ def contents():
         if res['user_id'] and res['user_id'] == 'auth0|60f28997680b890068f4bea7':
             res['demo'] = dt
         db.urls.insert_one(res)
-        qu = {}
-        qu['created_at'] = res['created_at']
-        qu['task_id'] = session['form_token']
-        qu['job_action'] = "after_creation"
-        qu['status'] = 0
-        db.queues.insert_one(qu)
+
+        # add two tasks into queue and chaining with pipe
+        (crawl.s('--task', res['task_id']) | export_csv.s('--task',
+         res['task_id']) | send_email.s('--task', res['task_id'])).apply_async()
+
         msg = 'success'
 
         return redirect(url_for('contents', msg=msg))
@@ -171,33 +169,23 @@ def temphtml():
 @requires_auth
 def preview():
     if request.method == 'POST':
-        print(session['preview_limit'])
-        if session['preview_limit'] > 0:
-            return 'Preview limit exceeded', 429
-        session['preview_limit'] = session['preview_limit'] + 1
         data = request.get_json()
         # data elements: data['preview_id'], data['url']
         # python main.py --preview pid_&_steps_&_args_&_method
         if data:
             pid_step_arg_method = data['preview_id'] + '_&_' + json.dumps(data['steps']) + \
             '_&_' + json.dumps(data['args']) + '_&_' + data['c_method']
-            try:
-                ret = subprocess.check_output(
-                    ["python", "/work/main.py", "--preview", pid_step_arg_method], universal_newlines=True)
-                session['preview_limit'] = session['preview_limit'] - 1
-            except Exception as e:
-                session['preview_limit'] = session['preview_limit'] - 1
-                return "Crawler is having difficulty", 500
-            print(ret)
-            if "__&Result&__" in ret:
-                ret = ret.split("__&Result&__")
-                if len(ret) > 1:
-                    result = ret[1].replace('Final Result:', '').strip()
-                    return str(result), 200
-                else:
-                    return "[]", 200
+            
+            # add task to queue
+            ret = crawl.s('--preview', pid_step_arg_method).apply_async(expires=60)
+            count = 0
+            while (ret.ready() == False) and (count <= 10):
+                time.sleep(3)
+                count += 1
+            if ret.state == 'SUCCESS':
+                return str(ret.result), 200
             else:
-                return "No Elements found.", 200
+                return "Crawler is having difficulty", 500
         else:
             return "No data input", 500
 

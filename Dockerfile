@@ -8,6 +8,7 @@ RUN pip3 install -r requirements.txt
 ENV FLASK_APP=login/server.py
 ENV FLASK_RUN_HOST=0.0.0.0
 ENV FLASK_RUN_PORT=3000
+ENV PYTHONPATH="${PYTHONPATH}:/work"
 
 
-CMD ["flask","run"]
+CMD bash startup.sh && flask run
