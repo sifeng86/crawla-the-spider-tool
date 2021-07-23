@@ -46,8 +46,8 @@ class stepHelper:
         helper = {
             "find_element_by_id": '.find_element_by_id("{param}")',
             "find_elements_by_id": '.find_elements_by_id("{param}")',
-            "find_element_by_class": '.find_element_by_class("{param}")',
-            "find_elements_by_class": '.find_elements_by_class("{param}")',
+            "find_element_by_class": '.find_element_by_class_name("{param}")',
+            "find_elements_by_class": '.find_elements_by_class_name("{param}")',
             "find_element_by_css_selector": '.find_element_by_css_selector("{param}")',
             "find_elements_by_css_selector": '.find_elements_by_css_selector("{param}")',
             "click": '.click()',
