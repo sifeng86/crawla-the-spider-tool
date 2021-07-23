@@ -146,7 +146,6 @@ for seed in records:
     user_id = seed.get('user_id',None)
     url = seed.get('url',None)
     steps = list(zip(seed['steps'], seed['args']))
-    print(steps)
 
     if method == "py_requests":
         if response == None:
@@ -161,8 +160,8 @@ for seed in records:
         soup_steps_helper = stepHelper.get_soup_steps_helper()
         for i in steps:
             try:
-                print(i[0],i[1])
-                print(soup_steps_helper[i[0]].format(param=i[1]))
+                print('Steps+Args: ',i[0], i[1])
+                print('Soup_cmd: ', soup_steps_helper[i[0]].format(param=i[1]))
                 if 'ext_str_' in i[0]:
                     if isinstance(temp, list):
                         item_list = []
@@ -222,7 +221,7 @@ for seed in records:
                     else:
                         head = "ret = ret"
                     exec(head + selenium_steps_helper[i[0]].format(param=i[1]))
-                print(i)
+                print('Selenium_cmd: ',i)
             driver.quit()
 
         except Exception as e: 
