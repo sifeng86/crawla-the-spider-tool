@@ -1,5 +1,4 @@
-import time
-import json, sys
+import sys
 import subprocess
 from login.lib.celery import celeryHelper
 
@@ -48,3 +47,28 @@ def send_email(_, mode, task_id):
         return 'success_send_email_' + mode + '_' + task_id
     except Exception as e:
         return 'error'
+
+
+if __name__ == "__main__":
+    if len(sys.argv) == 1:
+        exit('parameter is missing')
+    if sys.argv[1] == '--preview':  
+        # python celery_task1.py --preview pid0_&_steps_&_args_&_method
+        if len(sys.argv) == 3:
+            args = sys.argv[2]
+            ret = crawl.apply_async(('--preview', args), expires=60)
+            count = 0
+            result_output = ret.get()
+            print(str(result_output))
+            
+        else:
+            exit('preview parameter is missing')
+    elif sys.argv[1] == '--task':
+        # python celery_task1.py --task taskid
+        if len(sys.argv) == 3:
+            task_id = sys.argv[2]
+            # add two tasks into queue and chaining with pipe
+            (crawl.s('--task', task_id) | export_csv.s('--task',
+            task_id) | send_email.s('--task', task_id)).apply_async()
+        else:
+            exit('task parameter is missing')

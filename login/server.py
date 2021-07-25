@@ -20,7 +20,6 @@ from flask import send_from_directory
 from authlib.integrations.flask_client import OAuth
 from six.moves.urllib.parse import urlencode
 from lib.mongo import mongoHelper
-from celery_task1 import crawl, export_csv, send_email
 
 import constants
 
@@ -133,9 +132,12 @@ def contents():
             res['demo'] = dt
         db.urls.insert_one(res)
 
-        # add two tasks into queue and chaining with pipe
-        (crawl.s('--task', res['task_id']) | export_csv.s('--task',
-         res['task_id']) | send_email.s('--task', res['task_id'])).apply_async()
+        # add tasks into queue and chaining with pipe
+        try:
+            ret = subprocess.check_output(
+                ["python", "/work/celery_task1.py", "--task", res['task_id']], universal_newlines=True)
+        except:
+            pass
 
         msg = 'success'
 
@@ -177,14 +179,11 @@ def preview():
             '_&_' + json.dumps(data['args']) + '_&_' + data['c_method']
             
             # add task to queue
-            ret = crawl.s('--preview', pid_step_arg_method).apply_async(expires=60)
-            count = 0
-            while (ret.ready() == False) and (count <= 10):
-                time.sleep(3)
-                count += 1
-            if ret.state == 'SUCCESS':
-                return str(ret.result), 200
-            else:
+            try:
+                ret = subprocess.check_output(
+                    ["python", "/work/celery_task1.py", "--preview", pid_step_arg_method], universal_newlines=True)
+                return str(ret), 200
+            except:
                 return "Crawler is having difficulty", 500
         else:
             return "No data input", 500
@@ -197,8 +196,11 @@ def del_contents(tid):
         user_id = session[constants.PROFILE_KEY]['user_id']
         ret = db.urls.delete_one({"task_id": tid, "user_id": user_id})
         if ret.deleted_count == 1:
-            filename = tid + '.csv'
-            os.remove('/work/login/downloads/' + filename)
+            try:
+                filename = tid + '.csv'
+                os.remove('/work/login/downloads/' + filename)
+            except:
+                pass
         msg = 'deleted'
         return redirect(url_for('contents',msg=msg))
 

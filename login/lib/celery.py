@@ -25,9 +25,11 @@ class celeryHelper:
         app = Celery('task1', broker=broker, backend=backend)
 
         app.conf.update(
-            worker_concurrency=2,
+            worker_concurrency=1,
             timezone='Asia/Taipei',
             enable_utc=True,
-            result_expires=300
+            result_expires=300,
+            broker_pool_limit= 0,
+            redis_max_connections=15
         )
         return app
