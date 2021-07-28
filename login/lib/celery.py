@@ -12,15 +12,18 @@ class celeryHelper:
 
     def redis_conn():
         # Connection to redis
-        redis_pw = bytes(config["redis_pw"], encoding='utf-8')
-        redis_pw = crypto.decrypt_message(redis_pw)
-        redis_host_port = 'redis://:{pw}@{host_port}'.format(
-            pw=redis_pw,
-            host_port=config["redis_host_port"]
-        )
-
-        broker = 'redis://redis:6379'
-        backend = 'redis://redis:6379'
+        if config["redis_host_port"] == 'local':
+            broker = 'redis://redis:6379'
+            backend = 'redis://redis:6379'
+        else:
+            redis_pw = bytes(config["redis_pw"], encoding='utf-8')
+            redis_pw = crypto.decrypt_message(redis_pw)
+            redis_host_port = 'redis://:{pw}@{host_port}'.format(
+                pw=redis_pw,
+                host_port=config["redis_host_port"]
+            )
+            broker = redis_host_port
+            backend = redis_host_port
 
         app = Celery('task1', broker=broker, backend=backend)
 

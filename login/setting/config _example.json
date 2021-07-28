@@ -5,7 +5,7 @@
     "atlas_db": "example",
     "atlas_user": "hehe",
     "atlas_pw": "gABCDE(must use encryption)",
-    "redis_host_port": "redislabs.com:9999",
+    "redis_host_port": "redislabs.com:9999 or local (either one)",
     "redis_user": "hehe",
     "redis_pw": "gAA(must use encryption)",
     "mail_host": "smtp.sendgrid.net",
