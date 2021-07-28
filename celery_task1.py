@@ -56,9 +56,10 @@ if __name__ == "__main__":
         # python celery_task1.py --preview pid0_&_steps_&_args_&_method
         if len(sys.argv) == 3:
             args = sys.argv[2]
-            ret = crawl.apply_async(('--preview', args), expires=60)
+            ret = crawl.apply_async(('--preview', args), expires=120)
             count = 0
-            result_output = ret.get()
+            result_output = ret.get(timeout=50, propagate=False)
+            ret.forget()
             print(str(result_output))
             
         else:

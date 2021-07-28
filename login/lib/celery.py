@@ -19,8 +19,8 @@ class celeryHelper:
             host_port=config["redis_host_port"]
         )
 
-        broker = redis_host_port
-        backend = redis_host_port
+        broker = 'redis://redis:6379'
+        backend = 'redis://redis:6379'
 
         app = Celery('task1', broker=broker, backend=backend)
 
@@ -29,7 +29,8 @@ class celeryHelper:
             timezone='Asia/Taipei',
             enable_utc=True,
             result_expires=300,
-            broker_pool_limit= 0,
-            redis_max_connections=15
+            broker_pool_limit= 10,
+            redis_max_connections=15,
+            worker_cancel_long_running_tasks_on_connection_loss=True
         )
         return app

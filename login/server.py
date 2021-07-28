@@ -177,7 +177,7 @@ def preview():
         if data:
             pid_step_arg_method = data['preview_id'] + '_&_' + json.dumps(data['steps']) + \
             '_&_' + json.dumps(data['args']) + '_&_' + data['c_method']
-            
+
             # add task to queue
             try:
                 ret = subprocess.check_output(
