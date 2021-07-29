@@ -216,7 +216,7 @@ for seed in records:
                         results.append(ret)
 
                 else:
-                    if (type(ret) is str) or ret == None:
+                    if (type(ret) is str) or (type(ret) is list) or ret == None:
                         head = "ret = driver"
                     else:
                         head = "ret = ret"
