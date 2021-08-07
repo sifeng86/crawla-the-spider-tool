@@ -8,16 +8,19 @@ services:
       - ".:/work"
     networks:
       - crw
+    restart: always
   chrome:
     image: "selenium/standalone-chrome:latest"
     ports:
       - "4444:4444"
     networks:
       - crw
+    restart: always
   redis:
     image: redis:6.2-alpine
     networks:
       - crw
+    restart: always
 
 networks:
   crw:
