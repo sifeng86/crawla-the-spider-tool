@@ -9,6 +9,7 @@ services:
     networks:
       - crw
     restart: always
+    container_name: crawla_web
   chrome:
     image: "selenium/standalone-chrome:latest"
     ports:
@@ -16,11 +17,13 @@ services:
     networks:
       - crw
     restart: always
+    container_name: crawla_chrome
   redis:
     image: redis:6.2-alpine
     networks:
       - crw
     restart: always
+    container_name: crawla_redis
 
 networks:
   crw:
