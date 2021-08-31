@@ -131,6 +131,13 @@ Run tasks at custom scheduled time.
 * **--user userid** (Certain user only)
 * **--task taskid** (Certain task only)
 
+Export the results to csv file
+```
+0 1 * * * docker exec -t crawla_web python ./export_csv.py --task taskid >> /log/xx.log 2>&1
+```
+* **--task taskid** (Certain task only)
+* **--all** (all tasks)
+
 Send the result by mail for specific task only
 ```
 0 1 * * * docker exec -t crawla_web python ./sendmail.py --task taskid >> /log/xx.log 2>&1
