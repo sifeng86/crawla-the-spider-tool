@@ -191,6 +191,8 @@ for seed in records:
             options.add_argument(f"user-agent={user_agent}")
             options.add_argument('--headless')
             options.add_argument('--disable-gpu')
+            options.add_argument('--no-sandbox')
+            options.add_argument('--disable-dev-shm-usage')
             driver = webdriver.Remote(
                 command_executor='http://chrome:4444/wd/hub', options=options)
             driver.implicitly_wait(10)
