@@ -170,9 +170,8 @@ for seed in records:
                         # restore temp to original version
                         temp = ret
                     else:
-                        exec("temp = temp" +
-                            soup_steps_helper[i[0]].format(param=i[1]))
-                        results.append(temp.strip().replace('\\n', ' '))
+                        exec("temp = temp" + soup_steps_helper[i[0]].format(param=i[1])+".strip().replace('\\n',' ')")
+                        results.append(temp)
                         # restore temp to original version
                         temp = ret
                 else:
