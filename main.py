@@ -8,6 +8,17 @@ from login.lib.step_helper import stepHelper
 from login.lib.mongo import mongoHelper
 
 
+# initiate libraries
+ua = UserAgent()
+errors = 0
+user_agent = ua.random
+print(user_agent)
+response = None
+mode = "normal"
+
+# Connection to mongodb
+db = mongoHelper.mongo_conn()
+
 def get_page(url):
     headers = {
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
@@ -22,18 +33,6 @@ def get_page(url):
 
 if len(sys.argv) <= 1:
     exit('no parameters')
-
-# initiate libraries
-ua = UserAgent()
-errors = 0
-user_agent = ua.random
-print(user_agent)
-response = None
-mode = "normal"
-
-# Connection to mongodb
-db = mongoHelper.mongo_conn()
-
 
 ########################
 # check the cmd commands
