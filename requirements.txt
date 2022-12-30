@@ -22,7 +22,7 @@ cssselect==1.1.0
 dateparser==1.0.0
 dnspython==2.1.0
 docutils==0.15.2
-fake-useragent==0.1.11
+fake-useragent==1.1.1
 Flask==1.1.2
 hyperlink==21.0.0
 idna==2.10
