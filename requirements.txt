@@ -22,7 +22,7 @@ cssselect==1.1.0
 dateparser==1.0.0
 dnspython==2.1.0
 docutils==0.15.2
-fake-useragent==1.1.1
+fake-useragent==2.1.0
 Flask==1.1.2
 hyperlink==21.0.0
 idna==2.10
@@ -67,3 +67,6 @@ w3lib==1.22.0
 wcwidth==0.2.5
 Werkzeug==1.0.1
 zope.interface==5.2.0
+langchain==0.1.0
+langchain-google-genai==0.0.3
+google-generativeai==0.3.1
