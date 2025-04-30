@@ -20,6 +20,7 @@ from flask import send_from_directory
 from authlib.integrations.flask_client import OAuth
 from six.moves.urllib.parse import urlencode
 from lib.mongo import mongoHelper
+from lib.llm_handler import get_gemini_response
 
 import constants
 
@@ -172,21 +173,29 @@ def temphtml():
 def preview():
     if request.method == 'POST':
         data = request.get_json()
-        # data elements: data['preview_id'], data['url']
-        # python main.py --preview pid_&_steps_&_args_&_method
-        if data:
-            pid_step_arg_method = data['preview_id'] + '_&_' + json.dumps(data['steps']) + \
-            '_&_' + json.dumps(data['args']) + '_&_' + data['c_method']
-
-            # add task to queue
-            try:
-                ret = subprocess.check_output(
-                    ["python", "/work/celery_task1.py", "--preview", pid_step_arg_method], universal_newlines=True)
-                return str(ret), 200
-            except:
-                return "Crawler is having difficulty", 500
+        if data['c_method'] == 'llm':
+            prompt = data['args'][0]
+            # Get webpage content from preview_contents collection
+            preview_content = db.preview_contents.find_one({"preview_id": data['preview_id']})
+            webpage_content = preview_content['contents'] if preview_content else None
+            result = get_gemini_response(prompt, webpage_content)
+            return jsonify(result)
         else:
-            return "No data input", 500
+            # data elements: data['preview_id'], data['url']
+            # python main.py --preview pid_&_steps_&_args_&_method
+            if data:
+                pid_step_arg_method = data['preview_id'] + '_&_' + json.dumps(data['steps']) + \
+                '_&_' + json.dumps(data['args']) + '_&_' + data['c_method']
+
+                # add task to queue
+                try:
+                    ret = subprocess.check_output(
+                        ["python", "/work/celery_task1.py", "--preview", pid_step_arg_method], universal_newlines=True)
+                    return str(ret), 200
+                except:
+                    return "Crawler is having difficulty", 500
+            else:
+                return "No data input", 500
 
 
 @app.route('/del_contents/<tid>', methods=['GET'])

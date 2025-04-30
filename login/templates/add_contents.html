@@ -62,11 +62,17 @@
                 </div>
                 <div class="form-check">
                   <input class="form-check-input" type="radio" name="c_method" id="py_selenium" value="py_selenium"  aria-describedby="seHelp">
-                  
                   <label class="form-check-label" for="py_selenium">
                     Selenium (<a href="https://selenium-python.readthedocs.io/" target="_blank">reference</a>)
                   </label>
                   <small id="seHelp" class="form-text text-muted">[Slow] javascript behavior in the rendering (Dynamic).</small>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="c_method" id="llm" value="llm" aria-describedby="llmHelp">
+                  <label class="form-check-label" for="llm">
+                    LLM
+                  </label>
+                  <small id="llmHelp" class="form-text text-muted">Use Large Language Model to extract information</small>
                 </div>
             </div>
           </div>
@@ -183,7 +189,7 @@
             newhtml += '<option value="find_element_by_class">BS4 - find one by class (no . required)</option>';
             newhtml += '<option value="find_elements_by_class">BS4 - find all by class (no . required)</option>';
             newhtml += '<option value="ext_str_get_text">BS4 - get_text()</option>';
-          } else {
+          } else if (method == 'py_selenium') {
             newhtml += '<option selected value="">Choose...</option>';
             newhtml += '<option value="find_element_by_id">selenium - find one by id (no # required)</option>';
             newhtml += '<option value="find_elements_by_id">selenium - find all by id (no # required)</option>';
@@ -194,6 +200,8 @@
             newhtml += '<option value="click">selenium - click()</option>';
             newhtml += '<option value="ext_str_get_text">selenium - .text</option>';
             newhtml += '<option value="ext_str_get_attribute">selenium - get_attribute()</option>';
+          } else if (method == 'llm') {
+            newhtml += '<option selected value="llm_prompt">LLM - Enter your prompt</option>';
           }
           return newhtml;
       }
@@ -202,6 +210,18 @@
           var method = $(this).val();
           var newhtml = pymethod(method);
           $('select').html(newhtml);
+          
+          // Update placeholder for LLM method
+          if (method == 'llm') {
+              $('.args').attr('placeholder', 'Enter your prompt here');
+              $('.args').val('');
+              $('#more1').hide(); // Hide the "+" button for LLM
+              $('#new-row').empty(); // Remove any additional rows
+          } else {
+              $('.args').attr('placeholder', 'give - if no argument');
+              $('.args').val('-');
+              $('#more1').show(); // Show the "+" button for other methods
+          }
       });
 
       $('#url').change(function () {
@@ -247,7 +267,8 @@
             "args": args,
             "preview_id": $('#f_token').val(),
             "c_method": $('input[name=c_method]:checked').val(),
-          };
+            "url": $('#url').val(),
+            };
           $.ajax("{{ url_for('preview') }}", {
             type: 'POST',
             data: JSON.stringify(params),
