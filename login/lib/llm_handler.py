@@ -32,7 +32,7 @@ def get_gemini_response(prompt, webpage_content=None):
         complete_prompt = f"{content_context}{prompt}"
         # Get response from model
         response = llm.invoke(complete_prompt)
-        return (response.content + "|| This is webpage content: " + webpage_content)
+        return (response.content)
         
     except Exception as e:
         return f"Error: {str(e)}"
