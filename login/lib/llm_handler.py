@@ -2,6 +2,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 import os
 import re
 from bs4 import BeautifulSoup
+import json
 
 def clean_webpage_content(content):
     """
@@ -18,13 +19,27 @@ def clean_webpage_content(content):
     text = re.sub(r'\s+', ' ', text).strip()  # Normalize whitespace
     return text
 
+def load_config():
+    """
+    Loads configuration from the config.json file.
+    """
+    config_path = os.path.join(os.path.dirname(__file__), "../setting/config.json")
+    with open(config_path, "r") as config_file:
+        return json.load(config_file)
+
 def get_gemini_response(prompt, webpage_content=None):
     try:
+        # Load configuration
+        config = load_config()
+        llm_config = config.get("llm", {}).get("gemini", {}) 
+        if not llm_config:
+            raise ValueError("Gemini configuration not found in configuration file")
+        
         # Initialize the Gemini model through LangChain
         llm = ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash-preview-04-17",
+            model=llm_config.get("model", "default-model"),
             google_api_key=os.getenv("GOOGLE_API_KEY"),
-            temperature=0.7
+            temperature=llm_config.get("temperature", 0.7)
         )
         if webpage_content:
             webpage_content = clean_webpage_content(webpage_content)
