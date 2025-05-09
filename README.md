@@ -31,19 +31,31 @@ A web based spider tooling which provide user a simple entry point to design a s
 ```
 #path: login/
 
+# Application configuration
+APP_PORT=3000
+APP_ENV=development
+SECRET_KEY=aaaaaaaaaa
+
+# AUTH0 configuration
+APP_PORT=3000
+APP_ENV=development
 AUTH0_CLIENT_ID=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 AUTH0_DOMAIN=abcdefg-999.us.auth0.com
-AUTH0_CLIENT_SECRET=aaaaaaaaaaa
+AUTH0_CLIENT_SECRET=
 AUTH0_CALLBACK_URL=http://localhost:3000/callback
 AUTH0_LOGOUT_REDIRECT_URL=http://localhost:3000/
 AUTH0_AUDIENCE=
-SECRET_KEY=aaaaaaaaaa
+
+
+# Google API key configuration
+GOOGLE_API_KEY=AAAA
 
 
 #explanation:
 1. Please refer the tutorial to get the needed info:
 https://auth0.com/docs/quickstart/webapp/python#configure-auth0
 2. "SECRET_KEY" is a key that flask section needed. You can input any string.
+3. This project is using google-gemini as LLM example.
 
 ```
 
@@ -66,6 +78,18 @@ https://auth0.com/docs/quickstart/webapp/python#configure-auth0
     "mail_sender": "me@example.com",
     "mail_user":"apikey",
     "mail_pw": "gAA(must use encryption)"
+    "llm": {
+        "gemini": {
+            "api_key": "gAA",
+            "model": "gemini-2.5-flash-preview-04-17",
+            "temperature": 0.7
+        },
+        "openapi": {
+            "api_key": "",
+            "model": "",
+            "temperature": 0.7
+        }
+    }
 }
 
 #explanation:
@@ -73,6 +97,8 @@ https://auth0.com/docs/quickstart/webapp/python#configure-auth0
 2. (mongo, redis) you can skip user/pw if using local mode.
 3. "must be encryption" mean need to use encryption tool
 4. encryption tool usage will be covered later on.
+5. llm gemini is an option if you want to use LLM feature.
+6. openapi not yet support, but it's in the future plan.
 
 ```
 #### -- First Run
@@ -121,7 +147,8 @@ docker-compose down
 
 ### Run the job periodic using crontab
 
-Run tasks at custom scheduled time.
+Run tasks at custom scheduled time. \
+*(Currently not support LLM method.)*
 ```
 0 1 * * * docker exec -t crawla_web python ./main.py --all >> /log/xx.log 2>&1
 ```
