@@ -12,5 +12,17 @@
     "mail_port": 465,
     "mail_sender": "me@example.com",
     "mail_user":"apikey",
-    "mail_pw": "gAA(must use encryption)"
+    "mail_pw": "gAA(must use encryption)",
+    "llm": {
+        "gemini": {
+            "api_key": "gAA",
+            "model": "gemini-2.5-flash-preview-04-17",
+            "temperature": 0.7
+        },
+        "openapi": {
+            "api_key": "",
+            "model": "",
+            "temperature": 0.7
+        }
+    }
 }
