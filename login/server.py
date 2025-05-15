@@ -173,29 +173,25 @@ def temphtml():
 def preview():
     if request.method == 'POST':
         data = request.get_json()
-        if data['c_method'] == 'llm':
-            prompt = data['args'][0]
-            # Get webpage content from preview_contents collection
-            preview_content = db.preview_contents.find_one({"preview_id": data['preview_id']})
-            webpage_content = preview_content['contents'] if preview_content else None
-            result = get_gemini_response(prompt, webpage_content)
-            return jsonify(result)
-        else:
-            # data elements: data['preview_id'], data['url']
-            # python main.py --preview pid_&_steps_&_args_&_method
-            if data:
-                pid_step_arg_method = data['preview_id'] + '_&_' + json.dumps(data['steps']) + \
-                '_&_' + json.dumps(data['args']) + '_&_' + data['c_method']
+        # data elements: data['preview_id'], data['url']
+        # python main.py --preview pid_&_steps_&_args_&_method_&_url
+        if data:
+            pid_step_arg_method_url = data['preview_id'] + '_&_' + json.dumps(data['steps']) + \
+            '_&_' + json.dumps(data['args']) + '_&_' + data['c_method'] + '_&_' + data['url']
 
-                # add task to queue
-                try:
-                    ret = subprocess.check_output(
-                        ["python", "/work/celery_task1.py", "--preview", pid_step_arg_method], universal_newlines=True)
-                    return str(ret), 200
-                except:
-                    return "Crawler is having difficulty", 500
-            else:
-                return "No data input", 500
+            # add task to queue
+            try:
+                ret = subprocess.check_output(
+                    ["python", "/work/celery_task1.py", "--preview", pid_step_arg_method_url], universal_newlines=True)
+                if data['c_method'] == 'py_llm':
+                    prompt = data['args'][0]
+                    result = get_gemini_response(prompt, ret)
+                    return jsonify(result)
+                return str(ret), 200
+            except:
+                return "Crawler is having difficulty", 500
+        else:
+            return "No data input", 500
 
 
 @app.route('/del_contents/<tid>', methods=['GET'])

@@ -19,17 +19,45 @@ mode = "normal"
 # Connection to mongodb
 db = mongoHelper.mongo_conn()
 
-def get_page(url):
-    headers = {
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-        "Accept-Encoding": "gzip, deflate",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Sec-Gpc": "1",
-        "Upgrade-Insecure-Requests": "1",
-        "User-Agent": user_agent
-    }
-    response = requests.get(url=url, headers=headers)
-    return response
+def get_page(url, use_selenium=False):
+    if use_selenium:
+        # Selenium-based fetching
+        options = Options()
+        options.add_argument("window-size=1366,784")
+        options.add_argument(f"user-agent={user_agent}")
+        options.add_argument('--headless')
+        options.add_argument('--disable-gpu')
+        options.add_argument('--no-sandbox')
+        options.add_argument('--disable-dev-shm-usage')
+        try:
+            driver = webdriver.Remote(
+                command_executor='http://chrome:4444/wd/hub', options=options)
+            driver.implicitly_wait(10)
+            driver.get(url)
+            page_source = driver.page_source
+            driver.quit()
+            return page_source
+        except Exception as e:
+            print(f"Error using Selenium: {e}")
+            if 'driver' in locals():
+                driver.quit()
+            return None
+    else:
+        # Requests-based fetching
+        headers = {
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+            "Accept-Encoding": "gzip, deflate",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Sec-Gpc": "1",
+            "Upgrade-Insecure-Requests": "1",
+            "User-Agent": user_agent
+        }
+        try:
+            response = requests.get(url=url, headers=headers)
+            return response
+        except Exception as e:
+            print(f"Error using requests: {e}")
+            return None
 
 if len(sys.argv) <= 1:
     exit('no parameters')
@@ -52,6 +80,11 @@ elif sys.argv[1] == '--py_requests':
     records = [i for i in results]
 
 elif sys.argv[1] == '--py_selenium':
+    # python main.py --py_selenium
+    results = db.urls.find({"c_method":"py_selenium"})
+    records = [i for i in results]
+
+elif sys.argv[1] == '--py_llm':
     # python main.py --py_selenium
     results = db.urls.find({"c_method":"py_selenium"})
     records = [i for i in results]
@@ -99,16 +132,17 @@ elif sys.argv[1] == '--temphtml':
         exit('preview parameter is missing')
 
 elif sys.argv[1] == '--preview':
-    # python main.py --preview pid0_&_steps_&_args_&_method
+    # python main.py --preview pid0_&_steps_&_args_&_method_&_url
     mode = "preview"
     if len(sys.argv) == 3:
         arg_items = sys.argv[2].split('_&_')
-        if len(arg_items) != 4:
+        if len(arg_items) != 5:
             exit('preview parameter is missing')
         arg_pid = arg_items[0]
         arg_steps = json.loads(arg_items[1])
         arg_args = json.loads(arg_items[2])
         arg_method = arg_items[3]
+        arg_url = arg_items[4]
 
         results = db.preview_contents.find(
             {"preview_id": arg_pid}).sort("_id", -1).limit(1)
@@ -122,6 +156,7 @@ elif sys.argv[1] == '--preview':
         records[0]['args'] = arg_args
         records[0]['c_method'] = arg_method
         records[0]['task_id'] = arg_pid
+        records[0]['url'] = arg_url
 
     else:
         exit('preview parameter is missing')
@@ -182,7 +217,7 @@ for seed in records:
                 print(e)
                 print("Steps or Args failed")
 
-    else:
+    elif method == "py_selenium":
         try:
             options = Options()
             options.add_argument("window-size=1366,784")
@@ -227,6 +262,15 @@ for seed in records:
         except Exception as e: 
             print(e)
             driver.quit()
+    
+    elif method == "py_llm":
+        try:
+            ret = get_page(url, True)
+            print(url)
+            results.append(ret)
+        except Exception as e: 
+                print(e)
+                driver.quit()
     
     # clean response
     response = None

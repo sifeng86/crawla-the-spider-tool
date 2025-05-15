@@ -68,8 +68,8 @@
                   <small id="seHelp" class="form-text text-muted">[Slow] javascript behavior in the rendering (Dynamic).</small>
                 </div>
                 <div class="form-check">
-                  <input class="form-check-input" type="radio" name="c_method" id="llm" value="llm" aria-describedby="llmHelp">
-                  <label class="form-check-label" for="llm">
+                  <input class="form-check-input" type="radio" name="c_method" id="py_llm" value="py_llm" aria-describedby="llmHelp">
+                  <label class="form-check-label" for="py_llm">
                     LLM
                   </label>
                   <small id="llmHelp" class="form-text text-muted">Use Large Language Model to extract information</small>
@@ -200,7 +200,7 @@
             newhtml += '<option value="click">selenium - click()</option>';
             newhtml += '<option value="ext_str_get_text">selenium - .text</option>';
             newhtml += '<option value="ext_str_get_attribute">selenium - get_attribute()</option>';
-          } else if (method == 'llm') {
+          } else if (method == 'py_llm') {
             newhtml += '<option selected value="llm_prompt">LLM - Enter your prompt</option>';
           }
           return newhtml;
@@ -212,15 +212,19 @@
           $('select').html(newhtml);
           
           // Update placeholder for LLM method
-          if (method == 'llm') {
-              $('.args').attr('placeholder', 'Enter your prompt here');
+          if (method == 'py_llm') {
+              $('.args').attr('placeholder', 'how much is the product?');
               $('.args').val('');
               $('#more1').hide(); // Hide the "+" button for LLM
               $('#new-row').empty(); // Remove any additional rows
+              $('#save').prop('disabled', true); // Disable the "Save" button
+              $('#save').attr('title', 'Save is currently not supported for LLM method'); // Add hover info
           } else {
               $('.args').attr('placeholder', 'give - if no argument');
               $('.args').val('-');
               $('#more1').show(); // Show the "+" button for other methods
+              $('#save').prop('disabled', false); // Enable the "Save" button
+              $('#save').removeAttr('title'); // Remove hover info
           }
       });
 
@@ -290,5 +294,26 @@
           console.log(params);
       });
 
+      $(document).ready(function () {
+    // On page load, update the "steps" and "arguments" based on the selected method
+    var method = $('input[name=c_method]:checked').val();
+    var newhtml = pymethod(method);
+    $('select.steps').html(newhtml);
+
+    if (method == 'py_llm') {
+        $('.args').attr('placeholder', 'how much is the product?');
+        $('.args').val('');
+        $('#more1').hide(); // Hide the "+" button for LLM
+        $('#new-row').empty(); // Remove any additional rows
+        $('#save').prop('disabled', true); // Disable the "Save" button
+        $('#save').attr('title', 'Save is currently not supported for LLM method'); // Add hover info
+    } else {
+        $('.args').attr('placeholder', 'give - if no argument');
+        $('.args').val('-');
+        $('#more1').show(); // Show the "+" button for other methods
+        $('#save').prop('disabled', false); // Enable the "Save" button
+        $('#save').removeAttr('title'); // Remove hover info
+    }
+});
     </script>
 </html>
