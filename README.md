@@ -1,4 +1,7 @@
 # Crawla - the spider tool
+All you might want to ask:
+
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/sifeng86/crawla-the-spider-tool)
 
 This tool is suitable for developer who need to develop a lot of spiders.  
 
