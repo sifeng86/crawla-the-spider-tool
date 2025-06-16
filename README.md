@@ -211,6 +211,8 @@ Alan Gan (https://www.linkedin.com/in/iamalan)
 
 ## Version History
 
+* 1.1
+    * Add LLM feature
 * 1.0 Beta
     * Initial Release
 
