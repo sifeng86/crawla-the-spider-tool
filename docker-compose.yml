@@ -1,29 +1,43 @@
-version: "3.5"
+version: "3.8"
 services:
   crawla_web:
     build: .
     ports:
       - "3000:3000"
-    volumes: 
+    volumes:
       - ".:/work"
     networks:
       - crw
     restart: always
     container_name: crawla_web
+    environment:
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      - redis
+      - chrome
+
   chrome:
-    image: "selenium/standalone-chrome:latest"
+    image: "selenium/standalone-chrome:131.0"
     ports:
       - "4444:4444"
     networks:
       - crw
     restart: always
     container_name: crawla_chrome
+    shm_size: '2gb'
+    environment:
+      - SE_NODE_MAX_SESSIONS=4
+      - SE_NODE_OVERRIDE_MAX_SESSIONS=true
+
   redis:
-    image: redis:6.2-alpine
+    image: redis:7.4-alpine
+    ports:
+      - "6379:6379"
     networks:
       - crw
     restart: always
     container_name: crawla_redis
+    command: redis-server --maxmemory 100mb --maxmemory-policy volatile-lru
 
 networks:
   crw:
