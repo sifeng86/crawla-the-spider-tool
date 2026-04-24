@@ -11,6 +11,11 @@ class StepExecutor:
     Safe step execution for web scraping without dangerous exec() calls.
     Supports BeautifulSoup, Selenium 4.x, and Playwright.
     """
+
+    LEGACY_STEP_ALIASES: Dict[str, str] = {
+        'find_element_by_css_selector': 'find_element_by_css',
+        'find_elements_by_css_selector': 'find_elements_by_css',
+    }
     
     # BeautifulSoup step handlers
     SOUP_HANDLERS: Dict[str, Callable] = {
@@ -62,7 +67,7 @@ class StepExecutor:
         'ext_str_get_href': lambda e, _: e.get_attribute('href') if e else None,
         'ext_str_get_src': lambda e, _: e.get_attribute('src') if e else None,
         # Navigation
-        'scroll_into_view': lambda e, _: e.location_once_scrolled_into_view,
+        'scroll_into_view': lambda e, _: e.location_once_scrolled_into_view and None,
     }
     
     # Playwright step handlers
@@ -120,7 +125,8 @@ class StepExecutor:
         Returns:
             Result of the step execution
         """
-        handler = cls.SOUP_HANDLERS.get(step_name)
+        normalized_name = cls.LEGACY_STEP_ALIASES.get(step_name, step_name)
+        handler = cls.SOUP_HANDLERS.get(normalized_name)
         if not handler:
             raise ValueError(f"Unknown BeautifulSoup step: {step_name}")
         return handler(element, param)
@@ -138,7 +144,8 @@ class StepExecutor:
         Returns:
             Result of the step execution
         """
-        handler = cls.SELENIUM_HANDLERS.get(step_name)
+        normalized_name = cls.LEGACY_STEP_ALIASES.get(step_name, step_name)
+        handler = cls.SELENIUM_HANDLERS.get(normalized_name)
         if not handler:
             raise ValueError(f"Unknown Selenium step: {step_name}")
         return handler(element, param)
@@ -156,7 +163,8 @@ class StepExecutor:
         Returns:
             Result of the step execution
         """
-        handler = cls.PLAYWRIGHT_HANDLERS.get(step_name)
+        normalized_name = cls.LEGACY_STEP_ALIASES.get(step_name, step_name)
+        handler = cls.PLAYWRIGHT_HANDLERS.get(normalized_name)
         if not handler:
             raise ValueError(f"Unknown Playwright step: {step_name}")
         return handler(element, param)
@@ -178,7 +186,7 @@ class StepExecutor:
             'playwright': cls.PLAYWRIGHT_HANDLERS,
         }
         handlers = handlers_map.get(method, {})
-        return list(handlers.keys())
+        return list(handlers.keys()) + list(cls.LEGACY_STEP_ALIASES.keys())
 
 
 # Legacy compatibility - keep the old stepHelper class for backward compatibility
@@ -206,6 +214,8 @@ class stepHelper:
             'find_elements_by_id': '.find_elements(By.ID, "{param}")',
             'find_element_by_class': '.find_element(By.CLASS_NAME, "{param}")',
             'find_elements_by_class': '.find_elements(By.CLASS_NAME, "{param}")',
+            'find_element_by_css': '.find_element(By.CSS_SELECTOR, "{param}")',
+            'find_elements_by_css': '.find_elements(By.CSS_SELECTOR, "{param}")',
             'find_element_by_css_selector': '.find_element(By.CSS_SELECTOR, "{param}")',
             'find_elements_by_css_selector': '.find_elements(By.CSS_SELECTOR, "{param}")',
             'find_element_by_xpath': '.find_element(By.XPATH, "{param}")',
@@ -225,6 +235,8 @@ class stepHelper:
             'find_elements_by_class': '.locator(".{param}").all()',
             'find_element_by_css': '.locator("{param}").first',
             'find_elements_by_css': '.locator("{param}").all()',
+            'find_element_by_css_selector': '.locator("{param}").first',
+            'find_elements_by_css_selector': '.locator("{param}").all()',
             'click': '.click()',
             'ext_str_get_text': '.text_content()',
             'ext_str_get_attribute': '.get_attribute("{param}")',

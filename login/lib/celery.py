@@ -7,8 +7,11 @@ from celery import Celery
 from .cryptograpy import Crypto
 
 # Load configuration
-with open("login/setting/config.json") as json_file:
-    config = json.load(json_file)
+try:
+    with open("login/setting/config.json") as json_file:
+        config = json.load(json_file)
+except:
+    config = {}
 
 crypto = Crypto()
 
@@ -33,18 +36,26 @@ class celeryHelper:
             return _app
         
         # Configure Redis connection
-        if config["redis_host_port"] == 'local':
+        import os
+        app_env = os.environ.get("APP_ENV", "local")
+        redis_host_port = "local"
+        try:
+            redis_host_port = config.get("redis_host_port", "local")
+        except:
+            pass
+
+        if app_env == 'local' or redis_host_port == 'local':
             broker = 'redis://redis:6379/0'
             backend = 'redis://redis:6379/0'
         else:
             redis_pw = bytes(config["redis_pw"], encoding='utf-8')
             redis_pw = crypto.decrypt_message(redis_pw)
-            redis_host_port = 'redis://:{pw}@{host_port}'.format(
+            conn_host_port = 'redis://:{pw}@{host_port}'.format(
                 pw=redis_pw,
-                host_port=config["redis_host_port"]
+                host_port=redis_host_port
             )
-            broker = redis_host_port
-            backend = redis_host_port
+            broker = conn_host_port
+            backend = conn_host_port
         
         _app = Celery('crawla_tasks', broker=broker, backend=backend)
         

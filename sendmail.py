@@ -1,10 +1,14 @@
-import sys, json
+import sys, json, os
 from login.lib.mongo import mongoHelper
 import smtplib
 from email.mime.text import MIMEText
 from login.lib.cryptograpy import Crypto
-with open("login/setting/config.json") as json_file:
-    config = json.load(json_file)
+
+try:
+    with open("login/setting/config.json") as json_file:
+        config = json.load(json_file)
+except (FileNotFoundError, json.JSONDecodeError):
+    config = {}
 
 crypto = Crypto()
 
@@ -32,8 +36,16 @@ else:
     exit('bad command')
 
 
-with open("login/templates/email1.html", encoding="utf-8") as htmlfile:
-    ori_template = htmlfile.read()
+if not config.get('mail_host'):
+    print("Email not configured (mail_host missing in config.json). Skipping.")
+    sys.exit(0)
+
+try:
+    with open("login/templates/email1.html", encoding="utf-8") as htmlfile:
+        ori_template = htmlfile.read()
+except FileNotFoundError:
+    print("Email template not found.")
+    sys.exit(0)
 
 
 for item in records:

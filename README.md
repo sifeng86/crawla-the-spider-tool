@@ -1,229 +1,170 @@
-# Crawla - the spider tool
-All you might want to ask:
+# Crawla - The Premium AI Web Spider Tool
 
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/sifeng86/crawla-the-spider-tool)
 
-This tool is suitable for developer who need to develop a lot of spiders.  
+Crawla is an advanced, AI-powered web spider tool designed to simplify data extraction. Built with a stunning modern Glassmorphism interface, it allows developers and data engineers to configure crawlers visually without dealing with complex code.
 
-Web interface to create and manage spiders easily for developer.  
-
-No hassle, create a spider in minutes.  
+With the latest 2.0 update, Crawla introduces **LLM Self-Healing** (auto-fixing broken selectors) and **Smart Data Extraction** (JSON Schema parsing) directly powered by Google Gemini AI, along with parallel processing for ultra-fast scraping.
 
 Demo: https://crawla.cachigo.com
-## Description
 
-A web based spider tooling which provide user a simple entry point to design a spider and it has a live preview section to estimate the result and the result also accumulated in a csv file for further analyzing. 
+## ✨ Key Features
+* **Set & Go Architecture**: Fully containerized with MongoDB, Redis, and Selenium Chrome included. Local Docker mode starts with built-in defaults.
+* **Premium UX/UI**: Beautiful Glassmorphism design, full Dark Mode support, and interactive Skeleton Loaders.
+* **LLM Self-Healing**: Automatically repairs broken CSS selectors using Gemini AI when websites update their layout.
+* **Smart Data Extraction**: Pass a JSON Schema and let LLM parse unstructured pages into perfect JSON automatically.
+* **High-Speed Concurrency**: Uses `ThreadPoolExecutor` to crawl multiple URLs simultaneously.
+* **4 Extraction Engines**: Choose between ⚡ Requests (BS4), 🌐 Selenium, 🎭 Playwright, or 🧠 LLM AI extraction.
 
-## Getting Started
+## 🚀 Getting Started (Set & Go)
 
-### Prerequisite
-#### -- Required
-* Docker
-* Docker-compose
-* Auth0 account (https://auth0.com/)
-* MongoDB (see optional for alternative)
-* Mail Server (see optional for alternative)
-#### -- Optional
-* MongoDB Atlas account (https://www.mongodb.com/cloud/atlas)
-* Sendgrid (https://sendgrid.com/)
+### Prerequisites
+* Docker with Compose support
+* Google Gemini API Key (Optional — only required for LLM features)
 
+### One-Command Local Start
 
-### Installation
-#### -- Configuration
-* create ***.env*** file (using .env_example)
-```
-#path: login/
-
-# Application configuration
-APP_PORT=3000
-APP_ENV=development
-SECRET_KEY=aaaaaaaaaa
-
-# AUTH0 configuration
-APP_PORT=3000
-APP_ENV=development
-AUTH0_CLIENT_ID=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-AUTH0_DOMAIN=abcdefg-999.us.auth0.com
-AUTH0_CLIENT_SECRET=
-AUTH0_CALLBACK_URL=http://localhost:3000/callback
-AUTH0_LOGOUT_REDIRECT_URL=http://localhost:3000/
-AUTH0_AUDIENCE=
-
-
-# Google API key configuration
-GOOGLE_API_KEY=AAAA
-
-
-#explanation:
-1. Please refer the tutorial to get the needed info:
-https://auth0.com/docs/quickstart/webapp/python#configure-auth0
-2. "SECRET_KEY" is a key that flask section needed. You can input any string.
-3. This project is using google-gemini as LLM example.
-
+**Step 1 — Start the application**
+```bash
+docker compose up -d --build
 ```
 
-* create ***config.json*** file (using config_example.json)
-```
-#path: login/setting/
+That's enough for local mode.
+* Open your browser to `http://localhost:3000`
+* Click `Get Started`, then local mode signs you in as Local Admin.
+* MongoDB, Redis, Selenium Chrome, and the Celery worker are all managed by Docker.
 
+**Step 2 — (Optional) Configure LLM features**
+
+For AI-powered extraction, set `GOOGLE_API_KEY` in your shell before starting Docker, or create `login/setting/config.json` from the example file for advanced LLM configuration:
+```bash
+cp login/setting/config_example.json login/setting/config.json
+```
+Then insert your `google_api_key` under `llm.gemini.api_key`.
+
+**Step 3 — (Optional) File-based app settings**
+```bash
+cp login/.env_example login/.env
+```
+
+---
+
+## 🛠 Advanced Configuration (Production)
+
+Change `APP_ENV=production` in `login/.env` and configure Auth0 to enable full authentication.
+
+### Auth0 Configuration (Production only)
+In `login/.env`, fill in:
+```env
+APP_ENV=production
+AUTH0_CLIENT_ID=your_client_id
+AUTH0_DOMAIN=your-tenant.us.auth0.com
+AUTH0_CLIENT_SECRET=your_secret
+AUTH0_CALLBACK_URL=https://your-domain.com/callback
+AUTH0_LOGOUT_REDIRECT_URL=https://your-domain.com/
+```
+
+### MongoDB Atlas (Production only)
+To use a managed Atlas cluster instead of the bundled MongoDB, set in `login/setting/config.json`:
+```json
 {
-    "host_url": "www.example.com",
-    "mongo_mode": "atlas or local (either one)",
-    "atlas_host": "cluster9999.abcdefg.mongodb.net",
-    "atlas_db": "example",
-    "atlas_user": "hehe",
-    "atlas_pw": "gABCDE(must use encryption)",
-    "redis_host_port": "redislabs.com:9999 or local (either one)",
-    "redis_user": "hehe",
-    "redis_pw": "gAA(must use encryption)",
-    "mail_host": "smtp.sendgrid.net",
-    "mail_port": 465,
-    "mail_sender": "me@example.com",
-    "mail_user":"apikey",
-    "mail_pw": "gAA(must use encryption)"
-    "llm": {
-        "gemini": {
-            "api_key": "gAA",
-            "model": "gemini-2.5-flash-preview-04-17",
-            "temperature": 0.7
-        },
-        "openapi": {
-            "api_key": "",
-            "model": "",
-            "temperature": 0.7
-        }
-    }
+  "mongo_mode": "atlas",
+  "atlas_host": "cluster.mongodb.net",
+  "atlas_db": "crawla",
+  "atlas_user": "username",
+  "atlas_pw": "encrypted_password"
 }
-
-#explanation:
-1. "host_url" is your site url
-2. (mongo, redis) you can skip user/pw if using local mode.
-3. "must be encryption" mean need to use encryption tool
-4. encryption tool usage will be covered later on.
-5. llm gemini is an option if you want to use LLM feature.
-6. openapi not yet support, but it's in the future plan.
-
 ```
-#### -- First Run
-```
-docker-compose build
-```
-#### -- Encryption tool
-1.Run docker.
-```
-docker run -it --rm -v ${PWD}:/work --name crawla crawla_web:latest bash
-```
-2.Generate key(first time only):
-```
-python key_generator.py
-```
-- rename the key to **"secret.key"** inside **<key>** folder
-
-3.Encrypt token & password.
-```
-python encrypt_token.py
-```
-```
-Enter your token: (type something here)
-```
-- return:
-```
-'gAAAAABgGSLAtS13rMuiKa6CkBP-ThisisexampleBd8zfEH2M2tr5Tgrq4N9whg=='
-Token is encrypted.
-```
-- copy the generated string only.
-
-4.Input the related information in **"setting/config.json"** file.
-- "atlas_pw", "redis_pw" and "mail_pw" must be encrypted.
-
-## Running the tool
-* Start the docker 
-  * add  **-d**  to run in the background
-```
-docker-compose up
-```
-* Stop the docker 
-```
-docker-compose down
+Atlas passwords must be encrypted. Inside the Docker container, run:
+```bash
+docker exec -it crawla_web bash
+python key_generator.py     # generates login/key/secret.key
+python encrypt_token.py     # encrypts your plaintext password
 ```
 
-
-### Run the job periodic using crontab
-
-Run tasks at custom scheduled time. \
-*(Currently not support LLM method.)*
-```
-0 1 * * * docker exec -t crawla_web python ./main.py --all >> /log/xx.log 2>&1
-```
-* **--all** (all tasks)
-* **--py_requests** Request tasks only)
-* **--py_selenium** (Selenium tasks only)
-* **--user userid** (Certain user only)
-* **--task taskid** (Certain task only)
-
-Export the results to csv file
-```
-0 1 * * * docker exec -t crawla_web python ./export_csv.py --task taskid >> /log/xx.log 2>&1
-```
-* **--task taskid** (Certain task only)
-* **--all** (all tasks)
-
-Send the result by mail for specific task only
-```
-0 1 * * * docker exec -t crawla_web python ./sendmail.py --task taskid >> /log/xx.log 2>&1
-```
-* **--task taskid** (Certain task only)
-
-*PS: You can get the taskid in the download link of the csv file*
-
-## More
-#### Advance
-You can limit the redis usage if your server has resources limitation.
-* log in to the running redis contatiner.
-```
-docker exec -it crawla_redis sh
+### Periodic Jobs (Crontab)
+Schedule automated crawl runs via crontab:
+```bash
+# Run all tasks every day at 1 AM
+0 1 * * * docker exec -t crawla_web python ./main.py --all >> /log/crawla.log 2>&1
 ```
 
+Options:
+* `--all` — all tasks
+* `--py_requests` — Requests/BS4 tasks only
+* `--py_selenium` — Selenium tasks only
+* `--py_playwright` — Playwright tasks only
+* `--py_llm` — LLM tasks only
+* `--task TASKID` — specific task by ID
+* `--user USERID` — latest task for a specific user
+
+---
+
+## 💡 Extraction Methods
+
+### ⚡ Requests (BS4)
+Fast HTTP requests + BeautifulSoup CSS/tag selectors. Best for static pages with no JavaScript rendering.
+
+### 🌐 Selenium
+Full Chrome browser automation. Use for pages that require JavaScript execution or user interaction (click, scroll, form fill).
+
+### 🎭 Playwright
+Modern browser automation — faster and lighter than Selenium with superior anti-detection. Supports the same step types as Selenium.
+
+### 🧠 LLM (AI-Powered)
+Uses Google Gemini to extract data from the page. Two modes:
+
+**Standard Prompt**: Enter any natural language question in the Arguments field.
+> *Example: "What is the price of the product?"*
+
+**Smart Data Extraction (JSON Schema)**: Enter a valid JSON Schema (must start with `{` and include `"type"`). Crawla prompts Gemini to extract the page content directly into your requested JSON format.
+> *Example: `{"type": "object", "properties": {"title": {"type": "string"}, "price": {"type": "number"}}}`*
+
+LLM tasks can be saved and scheduled just like other methods.
+
+---
+
+## 🔧 LLM Self-Healing
+
+When a BS4 navigation step (e.g., `select_one("#price > span")`) fails to find an element, Crawla automatically:
+1. Extracts the surrounding HTML snippet from the page.
+2. Sends it to Gemini with the failing selector.
+3. Gemini suggests a new working selector.
+4. Crawla retries the step with the healed selector.
+
+This is automatic for the BeautifulSoup flow. Browser-driven self-healing is not enabled yet.
+
+---
+
+## 🏗 Architecture
+
 ```
-redis-cli
-
-127.0.0.1:6379> config get maxmemory
-1) "maxmemory"
-2) "0"
-127.0.0.1:6379> config set maxmemory 100MB
-OK
-127.0.0.1:6379> config get maxmemory
-1) "maxmemory"
-2) "104857600"
-127.0.0.1:6379> config set maxmemory-policy volatile-lru
-OK
-127.0.0.1:6379> config get maxmemory-policy
-1) "maxmemory-policy"
-2) "volatile-lru"
-127.0.0.1:6379> config set maxclients 1000
-OK
-
+login/server.py      → Flask Web UI + REST API
+main.py              → Crawler engine (ThreadPoolExecutor concurrency)
+celery_task1.py      → Async task queue (Celery + Redis)
+login/lib/
+  ├── mongo.py       → MongoDB connection (pooled, Atlas + local)
+  ├── celery.py      → Redis/Celery connection helper
+  ├── step_helper.py → Safe step dispatch (BS4 / Selenium / Playwright)
+  ├── llm_handler.py → Gemini AI (caching, self-healing, smart extraction)
+  ├── stealth.py     → Anti-detection (UA rotation, stealth scripts)
+  ├── rate_limiter.py→ Per-domain rate limiting (thread-safe)
+  └── playwright_helper.py → Playwright stealth context manager
 ```
 
-## Authors
+**Infrastructure (Docker Compose):**
+| Service | Image | Port |
+|---------|-------|------|
+| `crawla_web` | Python 3.12 + Flask + Celery | 3000 |
+| `crawla_mongo` | mongo:6.0 | 27017 (internal) |
+| `crawla_redis` | redis:7.4-alpine | 6379 (internal) |
+| `crawla_chrome` | selenium/standalone-chrome:131 | 4444 (internal) |
 
-Alan Gan (https://www.linkedin.com/in/iamalan)
+---
 
-## Version History
+## 📝 License
+This project is licensed under the Apache License 2.0 - see the LICENSE.txt file for details.
 
-* 1.1
-    * Add LLM feature
-* 1.0 Beta
-    * Initial Release
-
-## License
-
-This project is licensed under the Apache License 2.0 - see the LICENSE.txt file for details
-
-## Acknowledgments
-
-Inspiration, code snippets, etc.
-* [Auth0 Python SDK](https://github.com/auth0-samples/auth0-python-web-app/)
-* [Flask](https://flask.palletsprojects.com/)
-* [Celery](https://docs.celeryproject.org)
-* more...
+## 🤝 Authors
+* Alan Gan
+* UI/UX & Core Optimizations by Antigravity

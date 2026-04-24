@@ -8,8 +8,11 @@ from pymongo.database import Database
 from .cryptograpy import Crypto
 
 # Load configuration
-with open("login/setting/config.json") as json_file:
-    config = json.load(json_file)
+try:
+    with open("login/setting/config.json") as json_file:
+        config = json.load(json_file)
+except:
+    config = {}
 
 crypto = Crypto()
 
@@ -33,8 +36,17 @@ class mongoHelper:
         
         if _db is not None:
             return _db
+
+        # Handle missing config or local mode
+        import os
+        app_env = os.environ.get("APP_ENV", "local")
+        mongo_mode = "local"
+        try:
+            mongo_mode = config.get("mongo_mode", "local")
+        except:
+            pass
         
-        if config["mongo_mode"] == "atlas":
+        if app_env != 'local' and mongo_mode == "atlas":
             # MongoDB Atlas connection
             atlas_pw = bytes(config["atlas_pw"], encoding='utf-8')
             atlas_pw = crypto.decrypt_message(atlas_pw)
@@ -58,13 +70,16 @@ class mongoHelper:
         else:
             # Local MongoDB connection
             _client = MongoClient(
-                'localhost',
+                'mongo',
                 27017,
                 maxPoolSize=10,
                 minPoolSize=2,
                 maxIdleTimeMS=30000,
             )
-            _db = _client[config.get("mongo_db", "crawla")]
+            try:
+                _db = _client[config.get("mongo_db", "crawla")]
+            except:
+                _db = _client["crawla"]
         
         return _db
     

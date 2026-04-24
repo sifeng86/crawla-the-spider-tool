@@ -20,7 +20,6 @@ from flask import send_from_directory
 from authlib.integrations.flask_client import OAuth
 from six.moves.urllib.parse import urlencode
 from lib.mongo import mongoHelper
-from lib.llm_handler import get_gemini_response
 
 import constants
 
@@ -28,17 +27,45 @@ ENV_FILE = find_dotenv()
 if ENV_FILE:
     load_dotenv(ENV_FILE)
 
+
+def get_app_env():
+    return env.get('APP_ENV', 'local')
+
+
+def is_local_mode():
+    return get_app_env() == 'local'
+
+
+def get_local_profile():
+    return {
+        'user_id': 'local_admin',
+        'name': 'Local Admin',
+        'email': 'admin@localhost',
+        'picture': ''
+    }
+
+
+def is_auth0_configured():
+    required_settings = (
+        AUTH0_CLIENT_ID,
+        AUTH0_CLIENT_SECRET,
+        AUTH0_DOMAIN,
+        AUTH0_CALLBACK_URL,
+        AUTH0_LOGOUT_REDIRECT_URL,
+    )
+    return all(required_settings)
+
 AUTH0_CALLBACK_URL = env.get(constants.AUTH0_CALLBACK_URL)
 AUTH0_LOGOUT_REDIRECT_URL = env.get(constants.AUTH0_LOGOUT_REDIRECT_URL)
 AUTH0_CLIENT_ID = env.get(constants.AUTH0_CLIENT_ID)
 AUTH0_CLIENT_SECRET = env.get(constants.AUTH0_CLIENT_SECRET)
 AUTH0_DOMAIN = env.get(constants.AUTH0_DOMAIN)
-AUTH0_BASE_URL = 'https://' + AUTH0_DOMAIN
+AUTH0_BASE_URL = f'https://{AUTH0_DOMAIN}' if AUTH0_DOMAIN else None
 AUTH0_AUDIENCE = env.get(constants.AUTH0_AUDIENCE)
 
 app = Flask(__name__, static_url_path='/public', static_folder='./public')
-app.secret_key = env.get(constants.SECRET_KEY)
-app.debug = True
+app.secret_key = env.get(constants.SECRET_KEY, os.urandom(24))
+app.debug = get_app_env() != 'production'
 app.TRAP_HTTP_EXCEPTIONS = True
 
 errors = 0
@@ -56,22 +83,27 @@ def handle_auth_error(ex):
 
 oauth = OAuth(app)
 
-auth0 = oauth.register(
-    'auth0',
-    client_id=AUTH0_CLIENT_ID,
-    client_secret=AUTH0_CLIENT_SECRET,
-    api_base_url=AUTH0_BASE_URL,
-    access_token_url=AUTH0_BASE_URL + '/oauth/token',
-    authorize_url=AUTH0_BASE_URL + '/authorize',
-    client_kwargs={
-        'scope': 'openid profile email',
-    },
-)
+auth0 = None
+if is_auth0_configured():
+    auth0 = oauth.register(
+        'auth0',
+        client_id=AUTH0_CLIENT_ID,
+        client_secret=AUTH0_CLIENT_SECRET,
+        api_base_url=AUTH0_BASE_URL,
+        access_token_url=AUTH0_BASE_URL + '/oauth/token',
+        authorize_url=AUTH0_BASE_URL + '/authorize',
+        client_kwargs={
+            'scope': 'openid profile email',
+        },
+    )
 
 
 def requires_auth(f):
     @wraps(f)
     def decorated(*args, **kwargs):
+        if is_local_mode():
+            session[constants.PROFILE_KEY] = get_local_profile()
+            return f(*args, **kwargs)
         if constants.PROFILE_KEY not in session:
             return redirect('/login')
         return f(*args, **kwargs)
@@ -87,6 +119,8 @@ def home():
 
 @app.route('/callback')
 def callback_handling():
+    if auth0 is None:
+        return "Auth0 is not configured", 503
     auth0.authorize_access_token()
     resp = auth0.get('userinfo')
     userinfo = resp.json()
@@ -103,6 +137,11 @@ def callback_handling():
 
 @app.route('/login')
 def login():
+    if is_local_mode():
+        session[constants.PROFILE_KEY] = get_local_profile()
+        return redirect(url_for('contents'))
+    if auth0 is None:
+        return "Auth0 is not configured", 503
     return auth0.authorize_redirect(redirect_uri=AUTH0_CALLBACK_URL, audience=AUTH0_AUDIENCE)
 
 
@@ -110,7 +149,7 @@ def login():
 @requires_auth
 def contents():
     if request.method == 'POST':
-        if not request.form.get('token') or request.form.get('token') != session['form_token']:
+        if not request.form.get('token') or request.form.get('token') != session.get('form_token'):
             return "Bad Request", 400
         error = None
         res = {}
@@ -160,12 +199,17 @@ def temphtml():
         data = request.get_json()
         # data elements: data['preview_id'], data['url']
         # python main.py --temphtml pid_&_url
-        if data:
-            pid_url = data['preview_id'] + '_&_'+ data['url']
-            ret = subprocess.run(
-                ["python", "/work/main.py", "--temphtml", pid_url])
-            print(ret)
-        return "success", 200
+        if not data or not data.get('preview_id') or not data.get('url'):
+            return "Missing preview_id or url", 400
+        pid_url = data['preview_id'] + '_&_' + data['url']
+        try:
+            subprocess.run(
+                ["python", "/work/main.py", "--temphtml", pid_url],
+                check=True,
+            )
+            return "success", 200
+        except subprocess.CalledProcessError:
+            return "Failed to cache preview content", 500
 
 
 @app.route('/preview', methods=['POST'])
@@ -175,23 +219,20 @@ def preview():
         data = request.get_json()
         # data elements: data['preview_id'], data['url']
         # python main.py --preview pid_&_steps_&_args_&_method_&_url
-        if data:
-            pid_step_arg_method_url = data['preview_id'] + '_&_' + json.dumps(data['steps']) + \
-            '_&_' + json.dumps(data['args']) + '_&_' + data['c_method'] + '_&_' + data['url']
+        required_keys = ('preview_id', 'steps', 'args', 'c_method', 'url')
+        if not data or not all(k in data for k in required_keys):
+            return "Missing required fields", 400
 
-            # add task to queue
-            try:
-                ret = subprocess.check_output(
-                    ["python", "/work/celery_task1.py", "--preview", pid_step_arg_method_url], universal_newlines=True)
-                if data['c_method'] == 'py_llm':
-                    prompt = data['args'][0]
-                    result = get_gemini_response(prompt, ret)
-                    return jsonify(result)
-                return str(ret), 200
-            except:
-                return "Crawler is having difficulty", 500
-        else:
-            return "No data input", 500
+        pid_step_arg_method_url = data['preview_id'] + '_&_' + json.dumps(data['steps']) + \
+        '_&_' + json.dumps(data['args']) + '_&_' + data['c_method'] + '_&_' + data['url']
+
+        # add task to queue
+        try:
+            ret = subprocess.check_output(
+                ["python", "/work/celery_task1.py", "--preview", pid_step_arg_method_url], universal_newlines=True)
+            return str(ret), 200
+        except:
+            return "Crawler is having difficulty", 500
 
 
 @app.route('/del_contents/<tid>', methods=['GET'])
@@ -226,6 +267,8 @@ def dw_csv(tid):
 @app.route('/logout')
 def logout():
     session.clear()
+    if is_local_mode() or auth0 is None:
+        return redirect(url_for('home'))
     params = {'returnTo': AUTH0_LOGOUT_REDIRECT_URL, 'client_id': AUTH0_CLIENT_ID}
     return redirect(auth0.api_base_url + '/v2/logout?' + urlencode(params))
 
@@ -233,16 +276,11 @@ def logout():
 @app.route('/dashboard')
 @requires_auth
 def dashboard():
+    userinfo_pretty = json.dumps(session.get(constants.JWT_PAYLOAD, session.get(constants.PROFILE_KEY, {})), indent=4)
     return render_template('dashboard.html',
                            userinfo=session[constants.PROFILE_KEY],
-                           userinfo_pretty=json.dumps(session[constants.JWT_PAYLOAD], indent=4))
-
-
-@app.errorhandler(Exception)
-def all_exception_handler(error):
-
-    return "Error: " + str(error.code)
+                           userinfo_pretty=userinfo_pretty)
 
 
 if __name__ == "__main__":
-    app.run(port=env.get('PORT', 3000))
+    app.run(port=env.get('APP_PORT', 3000))

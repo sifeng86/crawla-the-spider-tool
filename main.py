@@ -7,6 +7,7 @@ import json
 import sys
 import datetime
 from typing import List, Dict, Any, Optional, Tuple
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -20,6 +21,42 @@ from login.lib.rate_limiter import rate_limiter
 
 # Connection to mongodb
 db = mongoHelper.mongo_conn()
+
+PREVIEW_CACHE_METHODS = {'py_requests'}
+
+
+def should_use_preview_cache(method: str) -> bool:
+    return method in PREVIEW_CACHE_METHODS
+
+
+def cache_preview_content(preview_id: str, url: str) -> bool:
+    response = get_page_requests(url)
+    if not response:
+        return False
+
+    params = {
+        'url': url,
+        'preview_id': preview_id,
+        'contents': response.text,
+        'created_at': datetime.datetime.utcnow()
+    }
+    db.preview_contents.update_one(
+        {'preview_id': preview_id},
+        {'$set': params},
+        upsert=True,
+    )
+    return True
+
+
+def load_preview_content(preview_id: str, method: str) -> Optional[str]:
+    if not should_use_preview_cache(method):
+        return None
+
+    cached = list(db.preview_contents.find({"preview_id": preview_id}).limit(1))
+    if not cached:
+        return None
+
+    return cached[0].get('contents')
 
 
 def get_page_requests(url: str, use_rate_limit: bool = True) -> Optional[requests.Response]:
@@ -154,7 +191,21 @@ def execute_soup_steps(soup: BeautifulSoup, steps: List[Tuple[str, str]]) -> Lis
                 temp = original
             else:
                 # Navigation step - update temp
-                temp = StepExecutor.execute_soup(temp, step_name, param)
+                new_temp = StepExecutor.execute_soup(temp, step_name, param)
+                
+                if not new_temp or (isinstance(new_temp, list) and len(new_temp) == 0):
+                    print(f"Step '{step_name}' with '{param}' yielded empty. Attempting LLM Self-Healing...")
+                    try:
+                        from login.lib.llm_handler import get_gemini_self_healing
+                        snippet = str(temp)[:5000]
+                        healed_param = get_gemini_self_healing(step_name, param, snippet)
+                        if healed_param and healed_param != param:
+                            print(f"Healed parameter: {healed_param}")
+                            new_temp = StepExecutor.execute_soup(temp, step_name, healed_param)
+                    except Exception as he:
+                        print(f"Self-healing failed: {he}")
+                
+                temp = new_temp
                 
         except Exception as e:
             print(f"Step failed: {step_name} - {e}")
@@ -282,53 +333,60 @@ def process_crawl_task(seed: Dict[str, Any], response_cache: Optional[str] = Non
         
     elif method == "py_selenium":
         page_source, driver = get_page_selenium(url)
-        
         if driver:
             try:
-                if response_cache:
-                    # Use cached content for soup-based extraction
-                    soup = BeautifulSoup(response_cache, 'html.parser')
-                    results = execute_soup_steps(soup, steps)
-                else:
-                    results = execute_selenium_steps(driver, steps)
-                    driver.save_screenshot("screenshot.png")
+                results = execute_selenium_steps(driver, steps)
+                driver.save_screenshot("screenshot.png")
             finally:
                 driver.quit()
-                
+
     elif method == "py_playwright":
         from login.lib.playwright_helper import PlaywrightHelper
-        
+
         with PlaywrightHelper(use_stealth=True) as pw:
             pw.goto(url)
             page = pw.get_page()
-            
-            if response_cache:
-                soup = BeautifulSoup(response_cache, 'html.parser')
-                results = execute_soup_steps(soup, steps)
-            else:
-                results = execute_playwright_steps(page, steps)
+            results = execute_playwright_steps(page, steps)
                 
     elif method == "py_llm":
         # LLM method - fetch page and pass to LLM
         page_content = get_page_playwright(url)
         if page_content:
-            results.append(page_content)
+            prompt = ""
+            if seed.get('args') and len(seed.get('args')) > 0:
+                prompt = seed.get('args')[0]
+                
+            from login.lib.llm_handler import get_gemini_smart_extraction, get_gemini_response
+            
+            if prompt.strip().startswith('{') and '"type"' in prompt:
+                # It's likely a JSON schema
+                print(f"Using Smart Data Extraction with schema...")
+                res = get_gemini_smart_extraction(prompt, page_content)
+            else:
+                print(f"Using Standard LLM extraction...")
+                res = get_gemini_response(prompt, page_content)
+                
+            results.append(res)
     
     return results
 
 
-def save_results(seed: Dict[str, Any], results: List[Any], mode: str = "normal"):
+def save_results_batch(items_list: List[Dict], mode: str = "normal"):
     """
-    Save crawl results to database.
-    
-    Args:
-        seed: Task configuration
-        results: Extracted results
-        mode: Operation mode
+    Batch insert crawl results to database.
     """
-    if mode != "normal":
+    if mode != "normal" or not items_list:
         return
     
+    db.contents.insert_many(items_list)
+
+def prepare_result_item(seed: Dict[str, Any], results: List[Any], mode: str = "normal") -> Optional[Dict]:
+    """
+    Prepare result item for insertion.
+    """
+    if mode != "normal":
+        return None
+        
     items = {
         'contents': results,
         'task_id': seed.get('task_id'),
@@ -341,8 +399,8 @@ def save_results(seed: Dict[str, Any], results: List[Any], mode: str = "normal")
     user_id = seed.get('user_id')
     if user_id and user_id == 'auth0|60f28997680b890068f4bea7':
         items['demo'] = datetime.datetime.utcnow()
-    
-    db.contents.insert_one(items)
+        
+    return items
 
 
 def parse_arguments() -> Tuple[str, Optional[str], List[Dict]]:
@@ -396,31 +454,19 @@ def parse_arguments() -> Tuple[str, Optional[str], List[Dict]]:
         mode = "temphtml"
         if len(sys.argv) < 3:
             sys.exit('Preview parameter is missing')
-        arg_pid, arg_url = sys.argv[2].split('_&_')
-        
-        results = db.preview_contents.find({"preview_id": arg_pid}).sort("_id", -1).limit(1)
-        existing = list(results)
-        
-        if len(existing) == 0:
-            response = get_page_requests(arg_url)
-            if response:
-                params = {
-                    'url': arg_url,
-                    'preview_id': arg_pid,
-                    'contents': response.text,
-                    'created_at': datetime.datetime.utcnow()
-                }
-                db.preview_contents.insert_one(params)
-        else:
-            sys.exit('Contents cache existed!')
-        sys.exit('temphtml ended')
+        arg_pid, arg_url = sys.argv[2].split('_&_', 1)
+
+        if not cache_preview_content(arg_pid, arg_url):
+            sys.exit('Failed to cache preview content')
+
+        sys.exit(0)
         
     elif sys.argv[1] == '--preview':
         mode = "preview"
         if len(sys.argv) < 3:
             sys.exit('Preview parameter is missing')
         
-        arg_items = sys.argv[2].split('_&_')
+        arg_items = sys.argv[2].split('_&_', 4)
         if len(arg_items) != 5:
             sys.exit('Preview parameter format is invalid')
         
@@ -453,28 +499,38 @@ def main():
     """Main entry point."""
     mode, _, records = parse_arguments()
     
-    for seed in records:
+    items_to_insert = []
+    
+    def worker(seed):
         print(f"\n{'='*50}")
         print(f"Processing: {seed.get('task_name', seed.get('task_id', 'Unknown'))}")
         print(f"{'='*50}")
         
-        # Check for cached preview content
         response_cache = None
         if mode == "preview":
             pid = seed.get('task_id')
-            cached = list(db.preview_contents.find({"preview_id": pid}).limit(1))
-            if cached:
-                response_cache = cached[0].get('contents')
-        
-        # Process the crawl task
+            response_cache = load_preview_content(pid, seed.get('c_method', 'py_requests'))
+                
         results = process_crawl_task(seed, response_cache)
-        
-        # Save results
-        save_results(seed, results, mode)
-        
-        # Output results
         print("__&Result&__")
         print(f"Final Result: {results}")
+        
+        return seed, results
+
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        future_to_seed = {executor.submit(worker, seed): seed for seed in records}
+        for future in as_completed(future_to_seed):
+            seed = future_to_seed[future]
+            try:
+                processed_seed, results = future.result()
+                item = prepare_result_item(processed_seed, results, mode)
+                if item:
+                    items_to_insert.append(item)
+            except Exception as exc:
+                print(f"Task {seed.get('task_id')} generated an exception: {exc}")
+
+    if items_to_insert:
+        save_results_batch(items_to_insert, mode)
 
 
 if __name__ == "__main__":

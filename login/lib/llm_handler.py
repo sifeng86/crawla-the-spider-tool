@@ -49,13 +49,14 @@ def clean_webpage_content(content: str) -> str:
 def load_config() -> Dict[str, Any]:
     """
     Loads configuration from the config.json file.
-    
-    Returns:
-        Configuration dictionary
+    Returns empty dict if file is missing (LLM will rely on env var fallback).
     """
     config_path = os.path.join(os.path.dirname(__file__), "../setting/config.json")
-    with open(config_path, "r") as config_file:
-        return json.load(config_file)
+    try:
+        with open(config_path, "r") as config_file:
+            return json.load(config_file)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
 
 
 def get_cache_key(prompt: str, content: str) -> str:
@@ -137,16 +138,19 @@ def get_gemini_response(prompt: str, webpage_content: Optional[str] = None) -> s
         # Load configuration
         config = load_config()
         llm_config = config.get("llm", {}).get("gemini", {})
-        if not llm_config:
-            raise ValueError("Gemini configuration not found in config file")
-        
-        # Import here to avoid loading if cached
+
+        # API key: config.json takes precedence, fallback to env var
+        api_key = llm_config.get("api_key") or os.getenv("GOOGLE_API_KEY")
+        if not api_key:
+            raise ValueError("Google API key not configured. Set GOOGLE_API_KEY in .env or llm.gemini.api_key in config.json")
+
+        # Import here to avoid loading if not needed
         from langchain_google_genai import ChatGoogleGenerativeAI
-        
+
         # Initialize the Gemini model
         llm = ChatGoogleGenerativeAI(
             model=llm_config.get("model", "gemini-2.0-flash"),
-            google_api_key=os.getenv("GOOGLE_API_KEY"),
+            google_api_key=api_key,
             temperature=llm_config.get("temperature", 0.7),
             max_output_tokens=llm_config.get("max_output_tokens", 2048),
         )
@@ -211,3 +215,17 @@ def get_gemini_response_with_retry(
                 time.sleep(wait_time)
             else:
                 raise
+
+def get_gemini_self_healing(step_name: str, failed_param: str, html_snippet: str) -> Optional[str]:
+    """Use LLM to fix broken CSS selectors."""
+    prompt = f"The web scraping step '{step_name}' failed using the parameter '{failed_param}'. Based on this HTML snippet, provide a working CSS selector to extract the likely intended data. ONLY return the new selector string, without markdown or explanation.\n\nHTML:\n{html_snippet}"
+    try:
+        res = get_gemini_response(prompt)
+        return res.strip().strip('`').strip()
+    except:
+        return None
+
+def get_gemini_smart_extraction(schema: str, webpage_content: str) -> str:
+    """Use LLM to extract data based on JSON Schema."""
+    prompt = f"Extract information from the webpage and return ONLY a valid JSON object adhering strictly to this JSON schema:\n{schema}\nDo not include markdown blocks or other text."
+    return get_gemini_response(prompt, webpage_content)

@@ -10,14 +10,15 @@
         <link href="/public/app.css" rel="stylesheet">
     </head>
     <body class="home">
-        <div class="container">
-            <div class="login-page clearfix">
-                <div class="logged-in-box auth0-box logged-in">
-                    <img class="avatar" src="{{userinfo['picture']}}"/>
-                    <h2>Welcome {{userinfo['name']}}</h2>
-                    <pre>{{userinfo_pretty}}</pre>
-                    <a id="qsLogoutBtn" class="btn btn-primary btn-lg btn-logout btn-block" href="/logout">Logout</a>
+        <div class="home-container">
+            <div class="glass-panel login-box">
+                <img class="avatar rounded-circle mb-3" style="width: 100px; height: 100px; object-fit: cover; border: 3px solid var(--primary-color);" src="{{userinfo['picture']}}"/>
+                <h2>Welcome {{userinfo['name']}}</h2>
+                <div class="text-left bg-dark p-3 rounded my-4" style="overflow-x: auto;">
+                    <pre class="text-light m-0" style="font-size: 0.8rem;">{{userinfo_pretty}}</pre>
                 </div>
+                <a id="qsLogoutBtn" class="btn btn-info btn-lg btn-block mt-4" href="/logout">Logout</a>
+                <a id="qsHomeBtn" class="btn btn-primary btn-lg btn-block mt-2" href="/contents">Go to Tasks</a>
             </div>
         </div>
     </body>
