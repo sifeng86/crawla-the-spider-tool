@@ -29,9 +29,52 @@ class MainModuleTests(unittest.TestCase):
 
     def test_should_use_preview_cache_only_for_requests(self):
         self.assertTrue(self.main.should_use_preview_cache('py_requests'))
+        self.assertTrue(self.main.should_use_preview_cache('py_llm'))
         self.assertFalse(self.main.should_use_preview_cache('py_selenium'))
         self.assertFalse(self.main.should_use_preview_cache('py_playwright'))
-        self.assertFalse(self.main.should_use_preview_cache('py_llm'))
+
+    def test_cache_preview_content_prefers_requests_for_llm(self):
+        response = types.SimpleNamespace(text='<html>fast-preview</html>')
+
+        with patch.object(self.main, 'get_page_requests', return_value=response), \
+             patch.object(self.main, 'get_page_playwright') as get_page_playwright:
+            result = self.main.cache_preview_content('pid-llm', 'https://example.com', 'py_llm')
+
+        self.assertTrue(result)
+        get_page_playwright.assert_not_called()
+        self.fake_db.preview_contents.update_one.assert_called_once_with(
+            {'preview_id': 'pid-llm'},
+            {
+                '$set': {
+                    'url': 'https://example.com',
+                    'preview_id': 'pid-llm',
+                    'method': 'py_llm',
+                    'contents': '<html>fast-preview</html>',
+                    'created_at': ANY,
+                }
+            },
+            upsert=True,
+        )
+
+    def test_cache_preview_content_falls_back_to_playwright_for_llm(self):
+        with patch.object(self.main, 'get_page_requests', return_value=None), \
+             patch.object(self.main, 'get_page_playwright', return_value='<html>rendered</html>'):
+            result = self.main.cache_preview_content('pid-llm-fallback', 'https://example.com', 'py_llm')
+
+        self.assertTrue(result)
+        self.fake_db.preview_contents.update_one.assert_called_once_with(
+            {'preview_id': 'pid-llm-fallback'},
+            {
+                '$set': {
+                    'url': 'https://example.com',
+                    'preview_id': 'pid-llm-fallback',
+                    'method': 'py_llm',
+                    'contents': '<html>rendered</html>',
+                    'created_at': ANY,
+                }
+            },
+            upsert=True,
+        )
 
     def test_cache_preview_content_upserts_latest_html(self):
         response = types.SimpleNamespace(text='<html>fresh</html>')
@@ -46,6 +89,7 @@ class MainModuleTests(unittest.TestCase):
                 '$set': {
                     'url': 'https://example.com',
                     'preview_id': 'pid-1',
+                    'method': 'py_requests',
                     'contents': '<html>fresh</html>',
                     'created_at': ANY,
                 }
@@ -112,6 +156,56 @@ class MainModuleTests(unittest.TestCase):
         helper_instance.goto.assert_called_once_with('https://example.com')
         execute_playwright_steps.assert_called_once_with('page', [('find_element_by_css_selector', '.price')])
 
+    def test_process_crawl_task_uses_cached_html_for_llm_preview(self):
+        seed = {
+            'c_method': 'py_llm',
+            'url': 'https://example.com',
+            'args': ['What is the title?'],
+        }
+
+        with patch.object(self.main, 'get_page_playwright') as get_page_playwright, \
+             patch('login.lib.llm_handler.get_gemini_response', return_value='Crawla Title'):
+            result = self.main.process_crawl_task(seed, response_cache='<html>cached llm</html>')
+
+        self.assertEqual(result, ['Crawla Title'])
+        get_page_playwright.assert_not_called()
+
+    def test_process_crawl_task_returns_structured_json_for_smart_extraction(self):
+        seed = {
+            'c_method': 'py_llm',
+            'url': 'https://example.com',
+            'args': ['{"type":"object"}'],
+        }
+
+        with patch('login.lib.llm_handler.get_gemini_smart_extraction', return_value={'title': 'Crawla'}):
+            result = self.main.process_crawl_task(seed, response_cache='<html>cached llm</html>')
+
+        self.assertEqual(result, [{'title': 'Crawla'}])
+
+    def test_execute_soup_steps_attempts_llm_self_healing(self):
+        soup = object()
+        healed_node = object()
+
+        def execute_soup_side_effect(current, step_name, param):
+            if step_name == 'select_one' and param == '.broken-title':
+                return None
+            if step_name == 'select_one' and param == 'h3':
+                return healed_node
+            if step_name == 'ext_str_get_text' and current is healed_node:
+                return 'Crawla Data Extractor'
+            return None
+
+        with patch.object(self.main.StepExecutor, 'execute_soup', side_effect=execute_soup_side_effect), \
+             patch('login.lib.llm_handler.get_gemini_self_healing', return_value='h3'):
+            result = self.main.execute_soup_steps(soup, [('select_one', '.broken-title'), ('ext_str_get_text', '-')])
+
+        self.assertEqual(result, ['Crawla Data Extractor'])
+
+    def test_format_preview_results_uses_json(self):
+        result = self.main.format_preview_results([{'title': 'Crawla'}])
+
+        self.assertEqual(result, '[{"title": "Crawla"}]')
+
     def test_parse_arguments_temphtml_exits_zero_after_successful_cache(self):
         with patch.object(self.main, 'cache_preview_content', return_value=True), \
              patch.object(self.main.sys, 'argv', ['main.py', '--temphtml', 'pid_&_https://example.com']):
@@ -119,6 +213,15 @@ class MainModuleTests(unittest.TestCase):
                 self.main.parse_arguments()
 
         self.assertEqual(raised.exception.code, 0)
+
+    def test_parse_arguments_temphtml_supports_optional_method(self):
+        with patch.object(self.main, 'cache_preview_content', return_value=True) as cache_preview_content, \
+             patch.object(self.main.sys, 'argv', ['main.py', '--temphtml', 'pid_&_https://example.com_&_py_llm']):
+            with self.assertRaises(SystemExit) as raised:
+                self.main.parse_arguments()
+
+        self.assertEqual(raised.exception.code, 0)
+        cache_preview_content.assert_called_once_with('pid', 'https://example.com', 'py_llm')
 
 
 if __name__ == '__main__':

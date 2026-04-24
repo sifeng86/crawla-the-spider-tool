@@ -8,6 +8,30 @@ from typing import List, Optional
 
 class StealthConfig:
     """Anti-detection configuration for Selenium and Playwright crawlers."""
+
+    SELENIUM_STEALTH_SCRIPT = '''
+        Object.defineProperty(navigator, 'webdriver', {
+            get: () => undefined
+        });
+
+        // Override plugins
+        Object.defineProperty(navigator, 'plugins', {
+            get: () => [1, 2, 3, 4, 5]
+        });
+
+        // Override languages
+        Object.defineProperty(navigator, 'languages', {
+            get: () => ['en-US', 'en']
+        });
+
+        // Override permissions
+        const originalQuery = window.navigator.permissions.query;
+        window.navigator.permissions.query = (parameters) => (
+            parameters.name === 'notifications' ?
+                Promise.resolve({ state: Notification.permission }) :
+                originalQuery(parameters)
+        );
+    '''
     
     # Modern user agents (updated January 2025)
     USER_AGENTS: List[str] = [
@@ -122,32 +146,15 @@ class StealthConfig:
         Args:
             driver: Selenium WebDriver instance
         """
-        # Hide webdriver property
-        driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
-            'source': '''
-                Object.defineProperty(navigator, 'webdriver', {
-                    get: () => undefined
-                });
-                
-                // Override plugins
-                Object.defineProperty(navigator, 'plugins', {
-                    get: () => [1, 2, 3, 4, 5]
-                });
-                
-                // Override languages
-                Object.defineProperty(navigator, 'languages', {
-                    get: () => ['en-US', 'en']
-                });
-                
-                // Override permissions
-                const originalQuery = window.navigator.permissions.query;
-                window.navigator.permissions.query = (parameters) => (
-                    parameters.name === 'notifications' ?
-                        Promise.resolve({ state: Notification.permission }) :
-                        originalQuery(parameters)
-                );
-            '''
-        })
+        if hasattr(driver, 'execute_cdp_cmd'):
+            driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
+                'source': cls.SELENIUM_STEALTH_SCRIPT
+            })
+            return
+
+        if hasattr(driver, 'execute_script'):
+            driver.execute_script(cls.SELENIUM_STEALTH_SCRIPT)
+
     
     @classmethod
     def get_playwright_stealth_context(cls, browser, user_agent: Optional[str] = None):

@@ -1,6 +1,6 @@
 """
 LLM handler with response caching to reduce token costs.
-Supports Google Gemini via LangChain.
+Supports Google Gemini via the official SDK, with LangChain fallback.
 """
 import hashlib
 import os
@@ -14,6 +14,112 @@ from bs4 import BeautifulSoup
 # In-memory LLM response cache
 _llm_cache: Dict[str, str] = {}
 _cache_lock = Lock()
+DEFAULT_THINKING_LEVEL = "MINIMAL"
+
+
+def build_llm_prompt(prompt: str, webpage_content: str) -> str:
+    return f"""You are a web data extraction engine.
+
+Rules:
+- Use only the webpage content provided below.
+- Return only the final extracted answer.
+- Do not include reasoning, analysis, bullet points, numbered lists, markdown, code fences, or surrounding quotes.
+- If the answer cannot be found, return NOT_FOUND.
+
+Webpage Content:
+{webpage_content}
+
+User Request:
+{prompt}
+
+Final Answer:"""
+
+
+def get_llm_thinking_level(llm_config: Dict[str, Any]) -> str:
+    return str(llm_config.get("thinking_level", DEFAULT_THINKING_LEVEL)).upper()
+
+
+def extract_gemini_response_text(response: Any) -> Any:
+    text = getattr(response, 'text', None)
+    return text if text is not None else response
+
+
+def build_generate_config(llm_config: Dict[str, Any], types_module) -> Any:
+    config = {
+        'temperature': llm_config.get("temperature", 0.1),
+        'max_output_tokens': llm_config.get("max_output_tokens", 2048),
+    }
+
+    thinking_level = get_llm_thinking_level(llm_config)
+    if thinking_level:
+        config['thinking_config'] = types_module.ThinkingConfig(thinking_level=thinking_level)
+
+    return types_module.GenerateContentConfig(**config)
+
+
+def stringify_llm_output(result: Any) -> str:
+    if result is None:
+        return ''
+
+    if isinstance(result, str):
+        return result
+
+    if isinstance(result, list):
+        parts = []
+        for item in result:
+            if isinstance(item, dict):
+                text = item.get('text') or item.get('content') or item.get('value')
+                if text:
+                    parts.append(str(text))
+                    continue
+
+            text = getattr(item, 'text', None) or getattr(item, 'content', None)
+            if text:
+                parts.append(str(text))
+            else:
+                parts.append(str(item))
+
+        return '\n'.join(part for part in parts if part)
+
+    return str(result)
+
+
+def normalize_llm_output(result: Any) -> str:
+    cleaned = stringify_llm_output(result).strip()
+    if not cleaned:
+        return cleaned
+
+    fenced_block = re.fullmatch(r"```(?:json)?\s*(.*?)\s*```", cleaned, flags=re.DOTALL)
+    if fenced_block:
+        cleaned = fenced_block.group(1).strip()
+
+    try:
+        parsed = json.loads(cleaned)
+        if isinstance(parsed, (dict, list)):
+            return cleaned
+    except (TypeError, ValueError, json.JSONDecodeError):
+        pass
+
+    lines = [line.strip() for line in cleaned.splitlines() if line.strip()]
+    if not lines:
+        return cleaned
+
+    for line in reversed(lines):
+        lowered = line.lower()
+        if lowered.startswith('final answer:'):
+            return line.split(':', 1)[1].strip().strip('"\'')
+
+    if len(lines) == 1:
+        return lines[0].strip('"\'')
+
+    return lines[-1].strip('"\'')
+
+
+def parse_json_output(result: str) -> Any:
+    try:
+        return json.loads(result)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return result
 
 
 def clean_webpage_content(content: str) -> str:
@@ -144,16 +250,7 @@ def get_gemini_response(prompt: str, webpage_content: Optional[str] = None) -> s
         if not api_key:
             raise ValueError("Google API key not configured. Set GOOGLE_API_KEY in .env or llm.gemini.api_key in config.json")
 
-        # Import here to avoid loading if not needed
-        from langchain_google_genai import ChatGoogleGenerativeAI
-
-        # Initialize the Gemini model
-        llm = ChatGoogleGenerativeAI(
-            model=llm_config.get("model", "gemini-2.0-flash"),
-            google_api_key=api_key,
-            temperature=llm_config.get("temperature", 0.7),
-            max_output_tokens=llm_config.get("max_output_tokens", 2048),
-        )
+        model = llm_config.get("model", "gemini-2.0-flash")
         
         # Clean and prepare content
         if webpage_content:
@@ -161,20 +258,35 @@ def get_gemini_response(prompt: str, webpage_content: Optional[str] = None) -> s
         
         # Build the complete prompt
         if webpage_content:
-            complete_prompt = f"""Analyze the following webpage content and answer the question.
-
-Webpage Content:
-{webpage_content}
-
-Question: {prompt}
-
-Provide a concise and accurate response based on the webpage content."""
+            complete_prompt = build_llm_prompt(prompt, webpage_content)
         else:
             complete_prompt = prompt
-        
-        # Get response from model
-        response = llm.invoke(complete_prompt)
-        result = response.content
+
+        response_payload = None
+        try:
+            import google.genai as genai
+            from google.genai import types as genai_types
+
+            client = genai.Client(api_key=api_key)
+            response = client.models.generate_content(
+                model=model,
+                contents=complete_prompt,
+                config=build_generate_config(llm_config, genai_types),
+            )
+            response_payload = extract_gemini_response_text(response)
+        except ImportError:
+            from langchain_google_genai import ChatGoogleGenerativeAI
+
+            llm = ChatGoogleGenerativeAI(
+                model=model,
+                google_api_key=api_key,
+                temperature=llm_config.get("temperature", 0.1),
+                max_output_tokens=llm_config.get("max_output_tokens", 2048),
+            )
+            response = llm.invoke(complete_prompt)
+            response_payload = response.content
+
+        result = normalize_llm_output(response_payload)
         
         # Cache the response
         cache_response(cache_key, result)
@@ -225,7 +337,8 @@ def get_gemini_self_healing(step_name: str, failed_param: str, html_snippet: str
     except:
         return None
 
-def get_gemini_smart_extraction(schema: str, webpage_content: str) -> str:
+def get_gemini_smart_extraction(schema: str, webpage_content: str) -> Any:
     """Use LLM to extract data based on JSON Schema."""
     prompt = f"Extract information from the webpage and return ONLY a valid JSON object adhering strictly to this JSON schema:\n{schema}\nDo not include markdown blocks or other text."
-    return get_gemini_response(prompt, webpage_content)
+    response = get_gemini_response(prompt, webpage_content)
+    return parse_json_output(response)

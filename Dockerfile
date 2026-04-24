@@ -1,5 +1,8 @@
 FROM python:3.12-slim
 
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+ENV HOME=/home/crawla
+
 WORKDIR /work
 
 # Install system dependencies for Playwright
@@ -25,6 +28,9 @@ RUN apt-get update && apt-get install -y \
     libxkbcommon0 \
     libxrandr2 \
     xdg-utils \
+    && groupadd --system crawla \
+    && useradd --system --gid crawla --create-home --home-dir /home/crawla --shell /bin/bash crawla \
+    && mkdir -p /ms-playwright \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy and install Python dependencies
@@ -43,6 +49,11 @@ ENV PYTHONUNBUFFERED=1
 
 # Copy application code
 COPY . /work/
+
+RUN mkdir -p /work/login/downloads /work/login/key /work/login/setting \
+    && chown -R crawla:crawla /work /home/crawla /ms-playwright
+
+USER crawla
 
 # Start the application
 CMD bash startup.sh && flask run

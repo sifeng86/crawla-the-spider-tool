@@ -18,6 +18,7 @@ for path in (ROOT, LOGIN_DIR):
 def load_server_module(env_vars):
     sys.modules.pop('server', None)
     fake_db = types.SimpleNamespace(
+        contents=MagicMock(),
         urls=MagicMock(),
         preview_contents=MagicMock(),
     )
@@ -83,6 +84,25 @@ class ServerModuleTests(unittest.TestCase):
 
             self.assertEqual(response.status_code, 500)
             self.assertIn('Failed to cache preview content', response.get_data(as_text=True))
+
+    def test_delete_task_cleans_related_data(self):
+        with patch.dict(os.environ, {'APP_ENV': 'local', 'SECRET_KEY': 'test-secret'}, clear=False):
+            module, fake_db = load_server_module({'APP_ENV': 'local', 'SECRET_KEY': 'test-secret'})
+            client = module.app.test_client()
+
+            fake_db.urls.delete_one.return_value = types.SimpleNamespace(deleted_count=1)
+
+            with client.session_transaction() as session:
+                session[module.constants.PROFILE_KEY] = module.get_local_profile()
+
+            with patch.object(module.os, 'remove') as remove_file:
+                response = client.get('/del_contents/task-123')
+
+            self.assertEqual(response.status_code, 302)
+            fake_db.urls.delete_one.assert_called_once_with({'task_id': 'task-123', 'user_id': 'local_admin'})
+            fake_db.contents.delete_many.assert_called_once_with({'task_id': 'task-123'})
+            fake_db.preview_contents.delete_many.assert_called_once_with({'preview_id': 'task-123'})
+            remove_file.assert_called_once_with('/work/login/downloads/task-123.csv')
 
 
 if __name__ == '__main__':

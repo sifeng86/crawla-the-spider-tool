@@ -41,6 +41,7 @@ For AI-powered extraction, set `GOOGLE_API_KEY` in your shell before starting Do
 cp login/setting/config_example.json login/setting/config.json
 ```
 Then insert your `google_api_key` under `llm.gemini.api_key`.
+For faster preview responses with compatible Gemini/Gemma models, you can also set `llm.gemini.thinking_level` to `MINIMAL` in `login/setting/config.json`.
 
 **Step 3 — (Optional) File-based app settings**
 ```bash

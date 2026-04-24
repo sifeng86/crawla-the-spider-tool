@@ -153,6 +153,8 @@
         integrity="sha384-Piv4xVNRyMGpqkS2by6br4gNJ7DXjqk09RmUpJ8jgGtD7zP9yug3goQfGII0yAns"
         crossorigin="anonymous"></script>
     <script type="text/javascript">
+      var previewCacheRequest = null;
+
       // add row
       $('#more1').click(function () {
           var html = '';
@@ -223,6 +225,28 @@
           return newhtml;
       }
 
+      function primePreviewCache() {
+          var url = $('#url').val();
+          if (!url || !url.includes("http", 0)) {
+            previewCacheRequest = null;
+            return null;
+          }
+
+          var params = {
+            "url": url,
+            "preview_id": $('#f_token').val(),
+            "c_method": $('input[name=c_method]:checked').val()
+          };
+
+          previewCacheRequest = $.ajax("{{ url_for('temphtml') }}", {
+            type: 'POST',
+            data: JSON.stringify(params),
+            contentType: 'application/json; charset=utf-8'
+          });
+
+          return previewCacheRequest;
+      }
+
       $('input[type=radio]').change(function () {
           var method = $(this).val();
           var newhtml = pymethod(method);
@@ -240,36 +264,33 @@
           }
           $('#save').prop('disabled', false);
           $('#save').removeAttr('title');
+          $('#preview').removeAttr('disabled');
+
+          if ($('#url').val() && $('#url').val().includes("http", 0)) {
+            setTimeout(primePreviewCache, 300);
+          }
       });
 
       $('#url').change(function () {
           var url = $(this).val();
           if (url.includes("http",0)) {
             $('#preview').removeAttr('disabled');
-            setTimeout(() => {
-              var params = {
-                "url": url,
-                "preview_id": $('#f_token').val()
-              };
-              $.ajax("{{ url_for('temphtml') }}", {
-                type: 'POST',
-                data: JSON.stringify(params),
-                contentType: 'application/json; charset=utf-8',
-                success: function (data, status, xhr) {
-                },
-                error: function (jqXhr, textStatus, errorMessage) {
-                }
-              });
-             console.log(params);
-            }, 1000);
+            setTimeout(primePreviewCache, 1000);
           }
       });
 
       $('#preview').click(function () {
+          var slowPreviewTimer;
+          var method = $('input[name=c_method]:checked').val();
           $(this).prop('disabled', true);
           $('#result').empty();
           $('.msgs').empty();
           $('#result').append('<div class="skeleton" style="width: 100%; height: 100px;"></div>');
+          slowPreviewTimer = setTimeout(function () {
+            if ($('#preview').prop('disabled')) {
+              $('#result').append('<div id="preview-status-note" class="text-muted mt-3">Still working. Browser and LLM methods may take around 10-15 seconds.</div>');
+            }
+          }, 10000);
           var steps = [];
           var args = [];
           $.each($('.steps'), function (index, val) {
@@ -284,27 +305,51 @@
             "steps": steps,
             "args": args,
             "preview_id": $('#f_token').val(),
-            "c_method": $('input[name=c_method]:checked').val(),
+            "c_method": method,
             "url": $('#url').val(),
             };
-          $.ajax("{{ url_for('preview') }}", {
-            type: 'POST',
-            data: JSON.stringify(params),
-            contentType: 'application/json; charset=utf-8',
-            success: function (data, status, xhr) {
-              $('#result').empty();
-              $('#result').append('<strong>Result: </strong><span style="color:#59A52C;">' + data + '</span>');
-              $('#preview').removeAttr('disabled');
-            },
-            error: function (jqXhr, textStatus, errorMessage) {
-              $('#result').empty();
-              if (errorMessage == "INTERNAL SERVER ERROR") {
-                errorMessage = "Page timeout. Please refresh this page"
+
+          function sendPreviewRequest() {
+            $.ajax("{{ url_for('preview') }}", {
+              type: 'POST',
+              data: JSON.stringify(params),
+              contentType: 'application/json; charset=utf-8',
+              success: function (data, status, xhr) {
+                clearTimeout(slowPreviewTimer);
+                $('#result').empty();
+                $('#result').append('<strong>Result: </strong><span style="color:#59A52C;">' + data + '</span>');
+                $('#preview').removeAttr('disabled');
+              },
+              error: function (jqXhr, textStatus, errorMessage) {
+                clearTimeout(slowPreviewTimer);
+                $('#result').empty();
+                if (errorMessage == "INTERNAL SERVER ERROR") {
+                  errorMessage = "Page timeout. Please refresh this page"
+                }
+                $('#result').append('<strong style="color:rgb(243, 52, 19);">Error: </strong>' + errorMessage);
+                $('#preview').removeAttr('disabled');
               }
-              $('#result').append('<strong style="color:rgb(243, 52, 19);">Error: </strong>' + errorMessage);
-              $('#preview').removeAttr('disabled');
+            });
+          }
+
+          if ((method == 'py_requests' || method == 'py_llm') && previewCacheRequest) {
+            previewCacheRequest.always(function () {
+              previewCacheRequest = null;
+              sendPreviewRequest();
+            });
+          } else if (method == 'py_requests' || method == 'py_llm') {
+            var warmupRequest = primePreviewCache();
+            if (warmupRequest) {
+              warmupRequest.always(function () {
+                previewCacheRequest = null;
+                sendPreviewRequest();
+              });
+            } else {
+              sendPreviewRequest();
             }
-          });
+          } else {
+            sendPreviewRequest();
+          }
           console.log(params);
       });
 

@@ -22,23 +22,43 @@ from login.lib.rate_limiter import rate_limiter
 # Connection to mongodb
 db = mongoHelper.mongo_conn()
 
-PREVIEW_CACHE_METHODS = {'py_requests'}
+PREVIEW_CACHE_METHODS = {'py_requests', 'py_llm'}
+
+
+def utc_now() -> datetime.datetime:
+    return datetime.datetime.now(datetime.UTC)
+
+
+def get_preview_source(url: str, method: str) -> Optional[str]:
+    if method == 'py_llm':
+        response = get_page_requests(url)
+        if response and response.text:
+            return response.text
+
+        return get_page_playwright(url)
+
+    response = get_page_requests(url)
+    if not response:
+        return None
+
+    return response.text
 
 
 def should_use_preview_cache(method: str) -> bool:
     return method in PREVIEW_CACHE_METHODS
 
 
-def cache_preview_content(preview_id: str, url: str) -> bool:
-    response = get_page_requests(url)
-    if not response:
+def cache_preview_content(preview_id: str, url: str, method: str = 'py_requests') -> bool:
+    page_content = get_preview_source(url, method)
+    if not page_content:
         return False
 
     params = {
         'url': url,
         'preview_id': preview_id,
-        'contents': response.text,
-        'created_at': datetime.datetime.utcnow()
+        'method': method,
+        'contents': page_content,
+        'created_at': utc_now()
     }
     db.preview_contents.update_one(
         {'preview_id': preview_id},
@@ -57,6 +77,13 @@ def load_preview_content(preview_id: str, method: str) -> Optional[str]:
         return None
 
     return cached[0].get('contents')
+
+
+def format_preview_results(results: List[Any]) -> str:
+    try:
+        return json.dumps(results, ensure_ascii=False)
+    except TypeError:
+        return str(results)
 
 
 def get_page_requests(url: str, use_rate_limit: bool = True) -> Optional[requests.Response]:
@@ -350,7 +377,7 @@ def process_crawl_task(seed: Dict[str, Any], response_cache: Optional[str] = Non
                 
     elif method == "py_llm":
         # LLM method - fetch page and pass to LLM
-        page_content = get_page_playwright(url)
+        page_content = response_cache or get_page_playwright(url)
         if page_content:
             prompt = ""
             if seed.get('args') and len(seed.get('args')) > 0:
@@ -392,13 +419,13 @@ def prepare_result_item(seed: Dict[str, Any], results: List[Any], mode: str = "n
         'task_id': seed.get('task_id'),
         'task_name': seed.get('task_name'),
         'noti_email': seed.get('noti_email'),
-        'created_at': datetime.datetime.utcnow(),
-        'created_date': str(datetime.datetime.utcnow().date()),
+        'created_at': utc_now(),
+        'created_date': str(utc_now().date()),
     }
     
     user_id = seed.get('user_id')
     if user_id and user_id == 'auth0|60f28997680b890068f4bea7':
-        items['demo'] = datetime.datetime.utcnow()
+        items['demo'] = utc_now()
         
     return items
 
@@ -454,9 +481,14 @@ def parse_arguments() -> Tuple[str, Optional[str], List[Dict]]:
         mode = "temphtml"
         if len(sys.argv) < 3:
             sys.exit('Preview parameter is missing')
-        arg_pid, arg_url = sys.argv[2].split('_&_', 1)
+        arg_items = sys.argv[2].split('_&_', 2)
+        if len(arg_items) < 2:
+            sys.exit('Preview parameter format is invalid')
 
-        if not cache_preview_content(arg_pid, arg_url):
+        arg_pid, arg_url = arg_items[0], arg_items[1]
+        arg_method = arg_items[2] if len(arg_items) == 3 else 'py_requests'
+
+        if not cache_preview_content(arg_pid, arg_url, arg_method):
             sys.exit('Failed to cache preview content')
 
         sys.exit(0)
@@ -513,7 +545,8 @@ def main():
                 
         results = process_crawl_task(seed, response_cache)
         print("__&Result&__")
-        print(f"Final Result: {results}")
+        preview_output = format_preview_results(results) if mode == "preview" else results
+        print(f"Final Result: {preview_output}")
         
         return seed, results
 

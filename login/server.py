@@ -28,6 +28,10 @@ if ENV_FILE:
     load_dotenv(ENV_FILE)
 
 
+def utc_now():
+    return datetime.datetime.now(datetime.UTC)
+
+
 def get_app_env():
     return env.get('APP_ENV', 'local')
 
@@ -167,7 +171,7 @@ def contents():
         res['user_id'] = session[constants.PROFILE_KEY]['user_id']
         res['task_id'] = session['form_token']
         res['created_at'] = str(dateparser.parse('today').date())
-        dt = datetime.datetime.utcnow()
+        dt = utc_now()
         if res['user_id'] and res['user_id'] == 'auth0|60f28997680b890068f4bea7':
             res['demo'] = dt
         db.urls.insert_one(res)
@@ -201,7 +205,8 @@ def temphtml():
         # python main.py --temphtml pid_&_url
         if not data or not data.get('preview_id') or not data.get('url'):
             return "Missing preview_id or url", 400
-        pid_url = data['preview_id'] + '_&_' + data['url']
+        method = data.get('c_method', 'py_requests')
+        pid_url = data['preview_id'] + '_&_' + data['url'] + '_&_' + method
         try:
             subprocess.run(
                 ["python", "/work/main.py", "--temphtml", pid_url],
@@ -242,6 +247,8 @@ def del_contents(tid):
         user_id = session[constants.PROFILE_KEY]['user_id']
         ret = db.urls.delete_one({"task_id": tid, "user_id": user_id})
         if ret.deleted_count == 1:
+            db.contents.delete_many({"task_id": tid})
+            db.preview_contents.delete_many({"preview_id": tid})
             try:
                 filename = tid + '.csv'
                 os.remove('/work/login/downloads/' + filename)
