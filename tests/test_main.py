@@ -24,6 +24,7 @@ class MainModuleTests(unittest.TestCase):
             preview_contents=MagicMock(),
             contents=MagicMock(),
             urls=MagicMock(),
+            selector_memory=MagicMock(),
         )
         self.main = load_main_module(self.fake_db)
 
@@ -105,6 +106,28 @@ class MainModuleTests(unittest.TestCase):
             upsert=True,
         )
 
+    def test_cache_preview_content_scopes_record_to_user_when_provided(self):
+        response = types.SimpleNamespace(text='<html>fresh</html>')
+
+        with patch.object(self.main, 'get_page_requests', return_value=response):
+            result = self.main.cache_preview_content('pid-user', 'https://example.com', 'py_requests', user_id='user-1')
+
+        self.assertTrue(result)
+        self.fake_db.preview_contents.update_one.assert_called_once_with(
+            {'preview_id': 'pid-user', 'user_id': 'user-1'},
+            {
+                '$set': {
+                    'url': 'https://example.com',
+                    'preview_id': 'pid-user',
+                    'method': 'py_requests',
+                    'contents': '<html>fresh</html>',
+                    'created_at': ANY,
+                    'user_id': 'user-1',
+                }
+            },
+            upsert=True,
+        )
+
     def test_load_preview_content_skips_non_requests_methods(self):
         self.assertIsNone(self.main.load_preview_content('pid-2', 'py_selenium'))
         self.fake_db.preview_contents.find.assert_not_called()
@@ -118,6 +141,16 @@ class MainModuleTests(unittest.TestCase):
 
         self.assertEqual(content, '<html>cached</html>')
         self.fake_db.preview_contents.find.assert_called_once_with({'preview_id': 'pid-3'})
+
+    def test_load_preview_content_filters_by_user_when_provided(self):
+        cursor = MagicMock()
+        cursor.limit.return_value = [{'contents': '<html>cached</html>'}]
+        self.fake_db.preview_contents.find.return_value = cursor
+
+        content = self.main.load_preview_content('pid-3', 'py_requests', user_id='user-1')
+
+        self.assertEqual(content, '<html>cached</html>')
+        self.fake_db.preview_contents.find.assert_called_once_with({'preview_id': 'pid-3', 'user_id': 'user-1'})
 
     def test_process_crawl_task_ignores_cached_html_for_selenium(self):
         driver = MagicMock()
@@ -138,6 +171,7 @@ class MainModuleTests(unittest.TestCase):
         execute_selenium_steps.assert_called_once_with(
             driver,
             [('find_element_by_css_selector', '.price')],
+            ANY,
         )
         driver.save_screenshot.assert_called_once_with('screenshot.png')
         driver.quit.assert_called_once()
@@ -162,7 +196,7 @@ class MainModuleTests(unittest.TestCase):
         self.assertEqual(result, ['ok'])
         execute_soup_steps.assert_not_called()
         helper_instance.goto.assert_called_once_with('https://example.com')
-        execute_playwright_steps.assert_called_once_with('page', [('find_element_by_css_selector', '.price')])
+        execute_playwright_steps.assert_called_once_with('page', [('find_element_by_css_selector', '.price')], ANY)
 
     def test_process_crawl_task_uses_cached_html_for_llm_preview(self):
         seed = {
@@ -208,6 +242,50 @@ class MainModuleTests(unittest.TestCase):
             result = self.main.execute_soup_steps(soup, [('select_one', '.broken-title'), ('ext_str_get_text', '-')])
 
         self.assertEqual(result, ['Crawla Data Extractor'])
+
+    def test_execute_soup_steps_prefers_selector_memory_before_llm(self):
+        soup = object()
+        healed_node = object()
+        healing_context = {
+            'url': 'https://docs.github.com/en',
+            'method': 'py_requests',
+            'database': self.fake_db,
+            'events': [],
+        }
+
+        def execute_soup_side_effect(current, step_name, param):
+            if step_name == 'select_one' and param == '.broken-title':
+                return None
+            if step_name == 'select_one' and param == 'h3':
+                return healed_node
+            if step_name == 'ext_str_get_text' and current is healed_node:
+                return 'Crawla Data Extractor'
+            return None
+
+        with patch.object(self.main.StepExecutor, 'execute_soup', side_effect=execute_soup_side_effect), \
+             patch.object(self.main, 'get_selector_memory_candidates', return_value=['h3']) as get_selector_memory_candidates, \
+             patch.object(self.main, 'derive_selector_fallback_candidates', return_value=['main > h3']), \
+             patch('login.lib.llm_handler.get_gemini_self_healing') as get_gemini_self_healing, \
+             patch.object(self.main, 'record_selector_success') as record_selector_success:
+            result = self.main.execute_soup_steps(
+                soup,
+                [('select_one', '.broken-title'), ('ext_str_get_text', '-')],
+                healing_context,
+            )
+
+        self.assertEqual(result, ['Crawla Data Extractor'])
+        get_selector_memory_candidates.assert_called_once()
+        get_gemini_self_healing.assert_not_called()
+        record_selector_success.assert_called_with(
+            'https://docs.github.com/en',
+            'py_requests',
+            'select_one',
+            '.broken-title',
+            'h3',
+            strategy='memory',
+            database=self.fake_db,
+        )
+        self.assertEqual(healing_context['events'][0]['strategy'], 'memory')
 
     def test_execute_selenium_steps_attempts_llm_self_healing(self):
         driver = MagicMock()
@@ -272,7 +350,60 @@ class MainModuleTests(unittest.TestCase):
                 self.main.parse_arguments()
 
         self.assertEqual(raised.exception.code, 0)
-        cache_preview_content.assert_called_once_with('pid', 'https://example.com', 'py_llm')
+        cache_preview_content.assert_called_once_with('pid', 'https://example.com', 'py_llm', user_id=None)
+
+    def test_parse_arguments_temphtml_supports_json_payload(self):
+        payload = '{"preview_id":"pid","url":"https://example.com","c_method":"py_llm","user_id":"user-1"}'
+        with patch.object(self.main, 'cache_preview_content', return_value=True) as cache_preview_content, \
+             patch.object(self.main.sys, 'argv', ['main.py', '--temphtml', payload]):
+            with self.assertRaises(SystemExit) as raised:
+                self.main.parse_arguments()
+
+        self.assertEqual(raised.exception.code, 0)
+        cache_preview_content.assert_called_once_with('pid', 'https://example.com', 'py_llm', user_id='user-1')
+
+    def test_parse_arguments_temphtml_json_payload_treats_null_user_id_as_none(self):
+        payload = '{"preview_id":"pid","url":"https://example.com","c_method":"py_requests","user_id":null}'
+        with patch.object(self.main, 'cache_preview_content', return_value=True) as cache_preview_content, \
+             patch.object(self.main.sys, 'argv', ['main.py', '--temphtml', payload]):
+            with self.assertRaises(SystemExit) as raised:
+                self.main.parse_arguments()
+
+        self.assertEqual(raised.exception.code, 0)
+        cache_preview_content.assert_called_once_with('pid', 'https://example.com', 'py_requests', user_id=None)
+
+    def test_parse_arguments_preview_supports_json_payload(self):
+        payload = '{"preview_id":"pid","steps":["select_one"],"args":["h1"],"c_method":"py_requests","url":"https://example.com","user_id":"user-1"}'
+        with patch.object(self.main.sys, 'argv', ['main.py', '--preview', payload]):
+            mode, _, records = self.main.parse_arguments()
+
+        self.assertEqual(mode, 'preview')
+        self.assertEqual(records[0]['task_id'], 'pid')
+        self.assertEqual(records[0]['steps'], ['select_one'])
+        self.assertEqual(records[0]['args'], ['h1'])
+        self.assertEqual(records[0]['user_id'], 'user-1')
+
+    def test_parse_arguments_all_filters_paused_tasks(self):
+        self.fake_db.urls.find.return_value = [{'task_id': 'enabled-task'}]
+
+        with patch.object(self.main.sys, 'argv', ['main.py', '--all']):
+            mode, _, records = self.main.parse_arguments()
+
+        self.assertEqual(mode, 'normal')
+        self.assertEqual(records, [{'task_id': 'enabled-task'}])
+        self.fake_db.urls.find.assert_called_once_with({'schedule_enabled': {'$ne': False}})
+
+    def test_parse_arguments_method_specific_filters_paused_tasks(self):
+        self.fake_db.urls.find.return_value = [{'task_id': 'enabled-task', 'c_method': 'py_requests'}]
+
+        with patch.object(self.main.sys, 'argv', ['main.py', '--py_requests']):
+            mode, _, records = self.main.parse_arguments()
+
+        self.assertEqual(mode, 'normal')
+        self.assertEqual(records, [{'task_id': 'enabled-task', 'c_method': 'py_requests'}])
+        self.fake_db.urls.find.assert_called_once_with(
+            {'schedule_enabled': {'$ne': False}, 'c_method': 'py_requests'}
+        )
 
 
 if __name__ == '__main__':

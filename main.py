@@ -18,6 +18,12 @@ from login.lib.step_helper import StepExecutor
 from login.lib.mongo import mongoHelper
 from login.lib.stealth import StealthConfig
 from login.lib.rate_limiter import rate_limiter
+from login.lib.selector_memory import (
+    derive_selector_fallback_candidates,
+    get_selector_memory_candidates,
+    normalize_selector_value,
+    record_selector_success,
+)
 
 
 # Connection to mongodb
@@ -29,6 +35,29 @@ MAX_SELF_HEAL_HTML_CHARS = 5000
 
 def utc_now() -> datetime.datetime:
     return datetime.datetime.now(datetime.UTC)
+
+
+def build_preview_cache_query(preview_id: str, user_id: Optional[str] = None) -> Dict[str, Any]:
+    query: Dict[str, Any] = {'preview_id': preview_id}
+    if user_id:
+        query['user_id'] = user_id
+    return query
+
+
+def parse_preview_payload(raw_payload: str) -> Optional[Dict[str, Any]]:
+    try:
+        payload = json.loads(raw_payload)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return None
+
+    return payload if isinstance(payload, dict) else None
+
+
+def normalize_optional_text(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
 
 
 def get_preview_source(url: str, method: str) -> Optional[str]:
@@ -50,7 +79,7 @@ def should_use_preview_cache(method: str) -> bool:
     return method in PREVIEW_CACHE_METHODS
 
 
-def cache_preview_content(preview_id: str, url: str, method: str = 'py_requests') -> bool:
+def cache_preview_content(preview_id: str, url: str, method: str = 'py_requests', user_id: Optional[str] = None) -> bool:
     page_content = get_preview_source(url, method)
     if not page_content:
         return False
@@ -62,19 +91,21 @@ def cache_preview_content(preview_id: str, url: str, method: str = 'py_requests'
         'contents': page_content,
         'created_at': utc_now()
     }
+    if user_id:
+        params['user_id'] = user_id
     db.preview_contents.update_one(
-        {'preview_id': preview_id},
+        build_preview_cache_query(preview_id, user_id),
         {'$set': params},
         upsert=True,
     )
     return True
 
 
-def load_preview_content(preview_id: str, method: str) -> Optional[str]:
+def load_preview_content(preview_id: str, method: str, user_id: Optional[str] = None) -> Optional[str]:
     if not should_use_preview_cache(method):
         return None
 
-    cached = list(db.preview_contents.find({"preview_id": preview_id}).limit(1))
+    cached = list(db.preview_contents.find(build_preview_cache_query(preview_id, user_id)).limit(1))
     if not cached:
         return None
 
@@ -86,6 +117,13 @@ def format_preview_results(results: List[Any]) -> str:
         return json.dumps(results, ensure_ascii=False)
     except TypeError:
         return str(results)
+
+
+def build_scheduled_task_query(extra_filters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    query: Dict[str, Any] = {'schedule_enabled': {'$ne': False}}
+    if extra_filters:
+        query.update(extra_filters)
+    return query
 
 
 def supports_brotli() -> bool:
@@ -189,13 +227,85 @@ def playwright_result_needs_healing(result: Any) -> bool:
     return False
 
 
+def append_healing_event(
+    healing_context: Optional[Dict[str, Any]],
+    strategy: str,
+    step_name: str,
+    source_param: str,
+    resolved_param: str,
+):
+    if healing_context is None:
+        return
+
+    healing_context.setdefault('events', []).append(
+        {
+            'strategy': strategy,
+            'step_name': step_name,
+            'source_param': source_param,
+            'resolved_param': resolved_param,
+        }
+    )
+
+
+def remember_selector_success(
+    step_name: str,
+    source_param: str,
+    resolved_param: str,
+    strategy: str,
+    healing_context: Optional[Dict[str, Any]] = None,
+):
+    if healing_context is None:
+        return
+
+    record_selector_success(
+        healing_context.get('url', ''),
+        healing_context.get('method', ''),
+        step_name,
+        source_param,
+        resolved_param,
+        strategy=strategy,
+        database=healing_context.get('database', db),
+    )
+    if strategy != 'original':
+        append_healing_event(healing_context, strategy, step_name, source_param, resolved_param)
+
+
+def try_selector_candidate(
+    current: Any,
+    step_name: str,
+    source_param: str,
+    candidate_param: str,
+    strategy: str,
+    execute_step: Callable[[Any, str, str], Any],
+    result_needs_healing: Callable[[Any], bool],
+    failure_label: str,
+    healing_context: Optional[Dict[str, Any]] = None,
+) -> Any:
+    try:
+        candidate_result = execute_step(current, step_name, candidate_param)
+    except Exception as candidate_error:
+        print(f"{failure_label} {strategy} candidate '{candidate_param}' failed: {candidate_error}")
+        return None
+
+    if result_needs_healing(candidate_result):
+        print(f"{failure_label} {strategy} candidate '{candidate_param}' still yielded empty.")
+        return None
+
+    print(f"{failure_label} recovered via {strategy}: {candidate_param}")
+    remember_selector_success(step_name, source_param, candidate_param, strategy, healing_context)
+    return candidate_result
+
+
 def attempt_llm_self_healing(
     current: Any,
     step_name: str,
     param: str,
     execute_step: Callable[[Any, str, str], Any],
+    result_needs_healing: Callable[[Any], bool],
     get_html_snippet: Callable[[Any], str],
     failure_message: str,
+    failure_label: str,
+    healing_context: Optional[Dict[str, Any]] = None,
 ) -> Any:
     print(f"{failure_message} Attempting LLM Self-Healing...")
 
@@ -205,7 +315,17 @@ def attempt_llm_self_healing(
         healed_param = get_gemini_self_healing(step_name, param, get_html_snippet(current))
         if healed_param and healed_param != param:
             print(f"Healed parameter: {healed_param}")
-            return execute_step(current, step_name, healed_param)
+            return try_selector_candidate(
+                current,
+                step_name,
+                param,
+                healed_param,
+                'llm',
+                execute_step,
+                result_needs_healing,
+                failure_label,
+                healing_context,
+            )
     except Exception as healing_error:
         print(f"Self-healing failed: {healing_error}")
 
@@ -220,33 +340,115 @@ def execute_step_with_self_healing(
     get_html_snippet: Callable[[Any], str],
     result_needs_healing: Callable[[Any], bool],
     failure_label: str,
+    healing_context: Optional[Dict[str, Any]] = None,
 ) -> Any:
+    normalized_source_param = normalize_selector_value(param)
+
     try:
         result = execute_step(current, step_name, param)
     except Exception as original_error:
+        healing_message = f"{failure_label} '{step_name}' with '{param}' failed: {original_error}."
+        healed_result = None
+        attempted_params = {normalized_source_param}
+
+        for strategy, candidates in (
+            (
+                'memory',
+                get_selector_memory_candidates(
+                    healing_context.get('url', '') if healing_context else '',
+                    healing_context.get('method', '') if healing_context else '',
+                    step_name,
+                    param,
+                    database=healing_context.get('database', db) if healing_context else db,
+                ),
+            ),
+            ('heuristic', derive_selector_fallback_candidates(step_name, param)),
+        ):
+            for candidate in candidates:
+                normalized_candidate = normalize_selector_value(candidate)
+                if not normalized_candidate or normalized_candidate in attempted_params:
+                    continue
+                attempted_params.add(normalized_candidate)
+                healed_result = try_selector_candidate(
+                    current,
+                    step_name,
+                    param,
+                    candidate,
+                    strategy,
+                    execute_step,
+                    result_needs_healing,
+                    failure_label,
+                    healing_context,
+                )
+                if healed_result is not None:
+                    return healed_result
+
         healed_result = attempt_llm_self_healing(
             current,
             step_name,
             param,
             execute_step,
+            result_needs_healing,
             get_html_snippet,
-            f"{failure_label} '{step_name}' with '{param}' failed: {original_error}.",
+            healing_message,
+            failure_label,
+            healing_context,
         )
         if healed_result is not None:
             return healed_result
         raise
 
     if result_needs_healing(result):
+        attempted_params = {normalized_source_param}
+        for strategy, candidates in (
+            (
+                'memory',
+                get_selector_memory_candidates(
+                    healing_context.get('url', '') if healing_context else '',
+                    healing_context.get('method', '') if healing_context else '',
+                    step_name,
+                    param,
+                    database=healing_context.get('database', db) if healing_context else db,
+                ),
+            ),
+            ('heuristic', derive_selector_fallback_candidates(step_name, param)),
+        ):
+            for candidate in candidates:
+                normalized_candidate = normalize_selector_value(candidate)
+                if not normalized_candidate or normalized_candidate in attempted_params:
+                    continue
+                attempted_params.add(normalized_candidate)
+                healed_result = try_selector_candidate(
+                    current,
+                    step_name,
+                    param,
+                    candidate,
+                    strategy,
+                    execute_step,
+                    result_needs_healing,
+                    failure_label,
+                    healing_context,
+                )
+                if healed_result is not None:
+                    return healed_result
+
         healed_result = attempt_llm_self_healing(
             current,
             step_name,
             param,
             execute_step,
+            result_needs_healing,
             get_html_snippet,
             f"{failure_label} '{step_name}' with '{param}' yielded empty.",
+            failure_label,
+            healing_context,
         )
         if healed_result is not None:
             return healed_result
+
+        return result
+
+    remember_selector_success(step_name, param, param, 'original', healing_context)
 
     return result
 
@@ -348,7 +550,11 @@ def get_page_playwright(url: str, use_rate_limit: bool = True) -> Optional[str]:
         return None
 
 
-def execute_soup_steps(soup: BeautifulSoup, steps: List[Tuple[str, str]]) -> List[Any]:
+def execute_soup_steps(
+    soup: BeautifulSoup,
+    steps: List[Tuple[str, str]],
+    healing_context: Optional[Dict[str, Any]] = None,
+) -> List[Any]:
     """
     Execute BeautifulSoup steps safely without exec().
     
@@ -392,6 +598,7 @@ def execute_soup_steps(soup: BeautifulSoup, steps: List[Tuple[str, str]]) -> Lis
                         build_soup_html_snippet,
                         basic_result_needs_healing,
                         'Step',
+                        healing_context,
                     )
                 else:
                     new_temp = StepExecutor.execute_soup(temp, step_name, param)
@@ -404,7 +611,11 @@ def execute_soup_steps(soup: BeautifulSoup, steps: List[Tuple[str, str]]) -> Lis
     return results
 
 
-def execute_selenium_steps(driver: webdriver.Remote, steps: List[Tuple[str, str]]) -> List[Any]:
+def execute_selenium_steps(
+    driver: webdriver.Remote,
+    steps: List[Tuple[str, str]],
+    healing_context: Optional[Dict[str, Any]] = None,
+) -> List[Any]:
     """
     Execute Selenium steps safely without exec().
     
@@ -447,6 +658,7 @@ def execute_selenium_steps(driver: webdriver.Remote, steps: List[Tuple[str, str]
                         lambda context: build_selenium_html_snippet(context, driver),
                         basic_result_needs_healing,
                         'Selenium step',
+                        healing_context,
                     )
                 else:
                     result = StepExecutor.execute_selenium(current, step_name, param)
@@ -459,7 +671,11 @@ def execute_selenium_steps(driver: webdriver.Remote, steps: List[Tuple[str, str]
     return results
 
 
-def execute_playwright_steps(page, steps: List[Tuple[str, str]]) -> List[Any]:
+def execute_playwright_steps(
+    page,
+    steps: List[Tuple[str, str]],
+    healing_context: Optional[Dict[str, Any]] = None,
+) -> List[Any]:
     """
     Execute Playwright steps safely without exec().
     
@@ -502,6 +718,7 @@ def execute_playwright_steps(page, steps: List[Tuple[str, str]]) -> List[Any]:
                         lambda context: build_playwright_html_snippet(context, page),
                         playwright_result_needs_healing,
                         'Playwright step',
+                        healing_context,
                     )
                 else:
                     result = StepExecutor.execute_playwright(current, step_name, param)
@@ -529,6 +746,12 @@ def process_crawl_task(seed: Dict[str, Any], response_cache: Optional[str] = Non
     method = seed.get('c_method', 'py_requests')
     url = seed.get('url', '')
     steps = list(zip(seed.get('steps', []), seed.get('args', [])))
+    healing_context = {
+        'url': url,
+        'method': method,
+        'database': db,
+        'events': [],
+    }
     
     print(f"Processing task with method: {method}, URL: {url}")
     
@@ -542,13 +765,13 @@ def process_crawl_task(seed: Dict[str, Any], response_cache: Optional[str] = Non
             else:
                 return results
         
-        results = execute_soup_steps(soup, steps)
+        results = execute_soup_steps(soup, steps, healing_context)
         
     elif method == "py_selenium":
         page_source, driver = get_page_selenium(url)
         if driver:
             try:
-                results = execute_selenium_steps(driver, steps)
+                results = execute_selenium_steps(driver, steps, healing_context)
                 driver.save_screenshot("screenshot.png")
             finally:
                 driver.quit()
@@ -559,7 +782,7 @@ def process_crawl_task(seed: Dict[str, Any], response_cache: Optional[str] = Non
         with PlaywrightHelper(use_stealth=True) as pw:
             pw.goto(url)
             page = pw.get_page()
-            results = execute_playwright_steps(page, steps)
+            results = execute_playwright_steps(page, steps, healing_context)
                 
     elif method == "py_llm":
         # LLM method - fetch page and pass to LLM
@@ -580,6 +803,9 @@ def process_crawl_task(seed: Dict[str, Any], response_cache: Optional[str] = Non
                 res = get_gemini_response(prompt, page_content)
                 
             results.append(res)
+
+    if healing_context['events']:
+        seed['_healing_events'] = healing_context['events']
     
     return results
 
@@ -630,23 +856,23 @@ def parse_arguments() -> Tuple[str, Optional[str], List[Dict]]:
     records = []
     
     if sys.argv[1] == '--all':
-        results = db.urls.find()
+        results = db.urls.find(build_scheduled_task_query())
         records = list(results)
         
     elif sys.argv[1] == '--py_requests':
-        results = db.urls.find({"c_method": "py_requests"})
+        results = db.urls.find(build_scheduled_task_query({"c_method": "py_requests"}))
         records = list(results)
         
     elif sys.argv[1] == '--py_selenium':
-        results = db.urls.find({"c_method": "py_selenium"})
+        results = db.urls.find(build_scheduled_task_query({"c_method": "py_selenium"}))
         records = list(results)
         
     elif sys.argv[1] == '--py_playwright':
-        results = db.urls.find({"c_method": "py_playwright"})
+        results = db.urls.find(build_scheduled_task_query({"c_method": "py_playwright"}))
         records = list(results)
         
     elif sys.argv[1] == '--py_llm':
-        results = db.urls.find({"c_method": "py_llm"})
+        results = db.urls.find(build_scheduled_task_query({"c_method": "py_llm"}))
         records = list(results)
         
     elif sys.argv[1] == '--user':
@@ -667,14 +893,24 @@ def parse_arguments() -> Tuple[str, Optional[str], List[Dict]]:
         mode = "temphtml"
         if len(sys.argv) < 3:
             sys.exit('Preview parameter is missing')
-        arg_items = sys.argv[2].split('_&_', 2)
-        if len(arg_items) < 2:
-            sys.exit('Preview parameter format is invalid')
+        payload = parse_preview_payload(sys.argv[2])
+        if payload:
+            arg_pid = normalize_optional_text(payload.get('preview_id')) or ''
+            arg_url = normalize_optional_text(payload.get('url')) or ''
+            arg_method = normalize_optional_text(payload.get('c_method')) or 'py_requests'
+            arg_user_id = normalize_optional_text(payload.get('user_id'))
+            if not arg_pid or not arg_url:
+                sys.exit('Preview parameter format is invalid')
+        else:
+            arg_items = sys.argv[2].split('_&_', 2)
+            if len(arg_items) < 2:
+                sys.exit('Preview parameter format is invalid')
 
-        arg_pid, arg_url = arg_items[0], arg_items[1]
-        arg_method = arg_items[2] if len(arg_items) == 3 else 'py_requests'
+            arg_pid, arg_url = arg_items[0], arg_items[1]
+            arg_method = arg_items[2] if len(arg_items) == 3 else 'py_requests'
+            arg_user_id = None
 
-        if not cache_preview_content(arg_pid, arg_url, arg_method):
+        if not cache_preview_content(arg_pid, arg_url, arg_method, user_id=arg_user_id):
             sys.exit('Failed to cache preview content')
 
         sys.exit(0)
@@ -683,24 +919,33 @@ def parse_arguments() -> Tuple[str, Optional[str], List[Dict]]:
         mode = "preview"
         if len(sys.argv) < 3:
             sys.exit('Preview parameter is missing')
-        
-        arg_items = sys.argv[2].split('_&_', 4)
-        if len(arg_items) != 5:
-            sys.exit('Preview parameter format is invalid')
-        
-        arg_pid, arg_steps, arg_args, arg_method, arg_url = arg_items
-        
-        results = db.preview_contents.find({"preview_id": arg_pid}).sort("_id", -1).limit(1)
-        cached = list(results)
-        
-        response_content = cached[0]['contents'] if cached else None
-        
+        payload = parse_preview_payload(sys.argv[2])
+        if payload:
+            arg_pid = normalize_optional_text(payload.get('preview_id')) or ''
+            arg_method = normalize_optional_text(payload.get('c_method')) or ''
+            arg_url = normalize_optional_text(payload.get('url')) or ''
+            arg_steps = payload.get('steps')
+            arg_args = payload.get('args')
+            arg_user_id = normalize_optional_text(payload.get('user_id'))
+            if not arg_pid or not arg_method or not arg_url or not isinstance(arg_steps, list) or not isinstance(arg_args, list):
+                sys.exit('Preview parameter format is invalid')
+        else:
+            arg_items = sys.argv[2].split('_&_', 4)
+            if len(arg_items) != 5:
+                sys.exit('Preview parameter format is invalid')
+
+            arg_pid, arg_steps_raw, arg_args_raw, arg_method, arg_url = arg_items
+            arg_steps = json.loads(arg_steps_raw)
+            arg_args = json.loads(arg_args_raw)
+            arg_user_id = None
+
         record = {
-            'steps': json.loads(arg_steps),
-            'args': json.loads(arg_args),
+            'steps': arg_steps,
+            'args': arg_args,
             'c_method': arg_method,
             'task_id': arg_pid,
             'url': arg_url,
+            'user_id': arg_user_id,
         }
         records = [record]
         
@@ -727,7 +972,7 @@ def main():
         response_cache = None
         if mode == "preview":
             pid = seed.get('task_id')
-            response_cache = load_preview_content(pid, seed.get('c_method', 'py_requests'))
+            response_cache = load_preview_content(pid, seed.get('c_method', 'py_requests'), seed.get('user_id'))
                 
         results = process_crawl_task(seed, response_cache)
         print("__&Result&__")

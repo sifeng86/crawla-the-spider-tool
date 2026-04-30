@@ -1,4 +1,5 @@
 import importlib
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -62,6 +63,20 @@ class CeleryTaskTests(unittest.TestCase):
                     'time_limit': 600,
                 },
             )
+
+    def test_preview_timeout_supports_json_payload(self):
+        args = json.dumps(
+            {
+                'preview_id': 'pid',
+                'steps': ['select_one'],
+                'args': ['h1'],
+                'c_method': 'py_llm',
+                'url': 'https://example.com',
+                'user_id': 'user-1',
+            }
+        )
+
+        self.assertEqual(self.module.get_preview_timeout(args), 570)
 
 
 if __name__ == '__main__':

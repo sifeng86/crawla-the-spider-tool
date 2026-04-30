@@ -16,6 +16,7 @@
     <body class="home">
       <div style="position: absolute; top: 1rem; right: 1rem;">
         <span class="text-muted mr-3">{{userinfo['name']}}</span>
+        <a href="{{ url_for('studio') }}" class="btn btn-sm btn-outline-info mr-2">Studio Beta</a>
         <a href="{{ url_for('logout') }}" class="btn btn-sm btn-info">Logout</a>
       </div>
       <div><img style="margin: 30px 20px; max-width: 200px; filter: drop-shadow(0 0 10px rgba(68, 199, 244, 0.3));" src="{{ url_for('static', filename='img/header-logo.png') }}"></div>
@@ -35,6 +36,13 @@
                 <label for="noti_email">Notification Email:</label>
                 <input type="email" class="form-control" name="noti_email" id="noti_email" value="{{userinfo['email']}}" aria-describedby="emailHelp" required>
                 <small id="emailHelp" class="form-text text-muted">We'll never share your email with anyone else.</small>
+              </div>
+              <div class="form-group col-md-5 d-flex align-items-end">
+                <div class="form-check mb-2">
+                  <input type="checkbox" class="form-check-input" name="schedule_enabled" id="schedule_enabled" value="1" checked>
+                  <label class="form-check-label text-white" for="schedule_enabled">Include this task in scheduled batch runs</label>
+                  <small class="form-text text-muted">External cron jobs calling <code>main.py --all</code> will only execute enabled tasks.</small>
+                </div>
               </div>
             </div>
             <div class="form-row">
@@ -105,8 +113,18 @@
               <div class="alert alert-danger">{{ error }}</div>
               {% elif request.args.get('msg')=='success' %}
               <div class="alert alert-success">Task is inserted successfully!</div>
+              {% elif request.args.get('msg')=='queued' %}
+              <div class="alert alert-success">Task has been queued successfully.</div>
+              {% elif request.args.get('msg')=='queue_failed' %}
+              <div class="alert alert-warning">Task was found, but queue dispatch failed.</div>
+              {% elif request.args.get('msg')=='schedule_enabled' %}
+              <div class="alert alert-success">Task is enabled for scheduled batch runs.</div>
+              {% elif request.args.get('msg')=='schedule_paused' %}
+              <div class="alert alert-warning">Task is paused for scheduled batch runs.</div>
               {% elif request.args.get('msg')=='deleted' %}
               <div class="alert alert-success">Task is deleted successfully!</div>
+              {% elif request.args.get('error')=='Task_not_found.' %}
+              <div class="alert alert-danger">Task not found for the current user.</div>
               {% endif %}
             </div>
             <div id="result" class="mt-4" style="min-height: 50px;"></div>
@@ -122,24 +140,59 @@
                   <th scope="col">#</th>
                   <th scope="col">Task Name</th>
                   <th scope="col">Url</th>
+                  <th scope="col">Schedule</th>
                   <th scope="col">Data</th>
-                  <th scope="col">Action</th>
+                  <th scope="col">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {% if records %}
                   {% for i in records %}
+                  {% set schedule_enabled = i.schedule_enabled if i.schedule_enabled is defined else True %}
+                  {% set has_task_id = i.task_id is defined and i.task_id %}
                   <tr>
                     <th scope="row">{{loop.index}}</th>
                     <td>{{i.task_name}}</td>
                     <td><a href="{{i.url}}" target="_blank" class="text-info">{{i.url|truncate(40)}}</a></td>
-                    <td><a href="{{ url_for('dw_csv', tid=i.task_id) }}" class="btn btn-sm btn-outline-success"><i class="fas fa-download"></i> CSV</a></td>
-                    <td><a href="{{ url_for('del_contents', tid=i.task_id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure?')"><i class="fas fa-trash"></i></a></td>
+                    <td>
+                      {% if schedule_enabled %}
+                      <span class="badge badge-success">Enabled</span>
+                      {% else %}
+                      <span class="badge badge-secondary">Paused</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if has_task_id %}
+                      <a href="{{ url_for('dw_csv', tid=i.task_id) }}" class="btn btn-sm btn-outline-success"><i class="fas fa-download"></i> CSV</a>
+                      {% else %}
+                      <span class="badge badge-warning">Missing task id</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if has_task_id %}
+                      <div class="d-flex flex-wrap">
+                        <form action="{{ url_for('run_contents', tid=i.task_id) }}" method="post" class="mr-2 mb-2">
+                          <input type="hidden" name="token" value="{{formtoken}}">
+                          <button type="submit" class="btn btn-sm btn-outline-info"><i class="fas fa-play"></i> Run now</button>
+                        </form>
+                        <form action="{{ url_for('schedule_contents', tid=i.task_id) }}" method="post" class="mr-2 mb-2">
+                          <input type="hidden" name="token" value="{{formtoken}}">
+                          <input type="hidden" name="schedule_enabled" value="{{ '0' if schedule_enabled else '1' }}">
+                          <button type="submit" class="btn btn-sm btn-outline-warning">
+                            <i class="fas fa-clock"></i> {{ 'Pause schedule' if schedule_enabled else 'Enable schedule' }}
+                          </button>
+                        </form>
+                        <a href="{{ url_for('del_contents', tid=i.task_id) }}" class="btn btn-sm btn-outline-danger mb-2" onclick="return confirm('Are you sure?')"><i class="fas fa-trash"></i></a>
+                      </div>
+                      {% else %}
+                      <span class="text-muted">Legacy record requires migration before actions are available.</span>
+                      {% endif %}
+                    </td>
                   </tr>
                   {% endfor %}
                 {% else %}
                   <tr>
-                    <td colspan="5" class="text-center text-muted">No tasks saved yet.</td>
+                    <td colspan="6" class="text-center text-muted">No tasks saved yet.</td>
                   </tr>
                 {% endif %}
               </tbody>

@@ -1,5 +1,6 @@
 import sys
 import subprocess
+import json
 from login.lib.celery import celeryHelper
 
 
@@ -17,6 +18,14 @@ LLM_TIME_LIMIT = 600
 
 
 def get_preview_method(args: str) -> str:
+    try:
+        payload = json.loads(args)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        payload = None
+
+    if isinstance(payload, dict):
+        return str(payload.get('c_method', '')).strip()
+
     parts = args.split(PREVIEW_SEPARATOR)
     if len(parts) < 4:
         return ''

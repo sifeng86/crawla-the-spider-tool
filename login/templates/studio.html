@@ -1,0 +1,1251 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Crawla Studio - Flow Workspace</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/css/bootstrap.min.css"
+      integrity="sha384-B0vP5xmATw1+K9KRQjQERJvTumQW0nPEzvF6L/Z6nronJ3oUOFUFpCjEUQouq2+l" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.15.3/css/fontawesome.min.css"
+      integrity="sha384-wESLQ85D6gbsF459vf1CiZ2+rr+CsxRY0RpiT1LlQpDnAgg6rwdsUF1+Ics2bni" crossorigin="anonymous">
+    <link href="/public/app.css" rel="stylesheet">
+  </head>
+  <body class="studio-body">
+    <header class="studio-topbar">
+      <div class="studio-brand-block">
+        <img src="{{ url_for('static', filename='img/header-logo.png') }}" alt="Crawla logo">
+        <div>
+          <p class="studio-eyebrow">Crawla AI Studio</p>
+          <h1 id="studio-title-heading">{{ studio_state.workspace.title }}</h1>
+        </div>
+      </div>
+      <div class="studio-topbar-actions">
+        <span class="studio-operator">{{ userinfo['name'] }}</span>
+        <a href="{{ url_for('contents') }}" class="btn btn-sm btn-outline-info">Classic Builder</a>
+        <a href="{{ url_for('logout') }}" class="btn btn-sm btn-info">Logout</a>
+      </div>
+    </header>
+
+    <main class="studio-shell">
+      <section class="glass-panel studio-hero-panel">
+        <div>
+          <p class="studio-eyebrow">Release 0 / 1 foundation</p>
+          <h2>Studio workspace is live</h2>
+          <p class="studio-hero-copy">This shell now edits the draft payload, primes preview cache, runs preview, and saves tasks into the existing queue without replacing the classic builder.</p>
+        </div>
+        <div class="studio-status-cluster">
+          <div class="studio-status-pill">Schema {{ studio_state.schema_version }}</div>
+          <div class="studio-status-pill accent">Draft {{ studio_state.draft_id }}</div>
+          <div class="studio-status-pill accent-soft">Goal: {{ studio_state.workspace.stability_goal }}</div>
+        </div>
+      </section>
+
+      <div class="studio-grid">
+        <section class="glass-panel studio-panel studio-method-panel">
+          <div class="studio-panel-head">
+            <div>
+              <p class="studio-panel-kicker">Method matrix</p>
+              <h3>Pick the runtime stance</h3>
+            </div>
+            <span class="studio-chip">{{ studio_catalog|length }} engines</span>
+          </div>
+          <div class="studio-method-list">
+            {% for method_key, method in studio_catalog.items() %}
+            <button type="button" class="studio-method-card{% if method_key == studio_state.selected_method %} is-active{% endif %}" data-method="{{ method_key }}">
+              <div class="studio-method-card-top">
+                <strong>{{ method.label }}</strong>
+                <span>{{ method.badge }}</span>
+              </div>
+              <p>{{ method.summary }}</p>
+              <small>{{ method.engine_label }}</small>
+            </button>
+            {% endfor %}
+          </div>
+          <div class="studio-method-detail" id="studio-method-detail"></div>
+        </section>
+
+        <section class="glass-panel studio-panel studio-preview-panel">
+          <div class="studio-panel-head">
+            <div>
+              <p class="studio-panel-kicker">Workspace controls</p>
+              <h3 id="studio-preview-headline">{{ studio_state.preview.headline }}</h3>
+            </div>
+            <span class="studio-chip" id="studio-preview-mode">{{ studio_state.preview.preview_mode }}</span>
+          </div>
+
+          <form class="studio-form-grid" id="studio-workspace-form">
+            <label class="studio-field">
+              <span>Task name</span>
+              <input type="text" id="studio-task-name" class="form-control" value="{{ studio_state.workspace.title }}" placeholder="Example: Docs changelog watcher">
+            </label>
+            <label class="studio-field studio-field-span-2">
+              <span>Target URL</span>
+              <input type="url" id="studio-target-url" class="form-control" value="{{ studio_state.workspace.target_url }}" placeholder="https://docs.github.com/en">
+            </label>
+            <label class="studio-field">
+              <span>Notification email</span>
+              <input type="email" id="studio-noti-email" class="form-control" value="{{ studio_state.workspace.notification_email }}" placeholder="alerts@example.com">
+            </label>
+            <div class="studio-field studio-field-span-2">
+              <span>Operator brief</span>
+              <div class="studio-inline-copy">{{ studio_state.workspace.subtitle }}</div>
+            </div>
+          </form>
+
+          <div class="studio-action-row">
+            <button type="button" class="btn btn-outline-info" id="studio-prime-preview">Prime Preview</button>
+            <button type="button" class="btn btn-info" id="studio-run-preview">Run Preview</button>
+            <button type="button" class="btn btn-primary" id="studio-save-task">Save Task</button>
+          </div>
+
+          <div class="studio-feedback studio-feedback-hidden" id="studio-feedback"></div>
+
+          <div class="studio-preview-stage">
+            <div class="studio-preview-orbit"></div>
+            <div class="studio-preview-screen">
+              <div class="studio-preview-screen-header">
+                <div>
+                  <p class="studio-preview-label" id="studio-preview-status">{{ studio_state.preview.status }}</p>
+                  <h4 id="studio-preview-title">URL and preview cache will appear here</h4>
+                </div>
+                <div class="studio-preview-target" id="studio-preview-target">No target URL yet</div>
+              </div>
+              <p id="studio-preview-detail">{{ studio_state.preview.detail }}</p>
+              <pre class="studio-preview-result" id="studio-preview-result">{{ studio_state.preview.last_result or 'No preview run yet. Prime cache for Requests / LLM, or run a live browser preview for Selenium / Playwright.' }}</pre>
+              <div class="studio-preview-metrics">
+                <div>
+                  <span>Preview ID</span>
+                  <strong>{{ studio_state.preview.preview_id }}</strong>
+                </div>
+                <div>
+                  <span>Operator</span>
+                  <strong>{{ studio_state.workspace.operator }}</strong>
+                </div>
+                <div>
+                  <span>Method</span>
+                  <strong id="studio-preview-method-name"></strong>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="studio-feature-grid">
+            {% for panel in studio_state.feature_panels %}
+            <article class="studio-feature-card studio-feature-{{ panel.status }}">
+              <span>{{ panel.label }}</span>
+              <strong>{{ panel.status|upper }}</strong>
+              <p>{{ panel.description }}</p>
+            </article>
+            {% endfor %}
+          </div>
+
+          <section class="studio-copilot-shell">
+            <div class="studio-panel-head">
+              <div>
+                <p class="studio-panel-kicker">AI copilot</p>
+                <h3>Describe the data goal, get a draft flow</h3>
+              </div>
+              <div class="studio-panel-toolbar">
+                <span class="studio-chip" id="studio-copilot-source">template</span>
+                <button type="button" class="btn btn-sm btn-outline-info" id="studio-run-copilot">Generate Flow</button>
+                <button type="button" class="btn btn-sm btn-info" id="studio-apply-copilot" disabled>Apply Suggestion</button>
+              </div>
+            </div>
+            <label class="studio-field">
+              <span>Goal for Copilot</span>
+              <textarea id="studio-copilot-goal" class="form-control studio-copilot-input" rows="3" placeholder="Example: Collect article titles and links from the docs content area, then prepare a clean flow I can refine in the inspector.">{{ studio_state.copilot.goal }}</textarea>
+            </label>
+            <div class="studio-copilot-note" id="studio-copilot-note">{{ studio_state.copilot.note }}</div>
+            <div class="studio-copilot-list" id="studio-copilot-list"></div>
+          </section>
+
+          <section class="studio-inspector-shell">
+            <div class="studio-panel-head">
+              <div>
+                <p class="studio-panel-kicker">Visual inspector</p>
+                <h3>Pick DOM targets from a safe snapshot</h3>
+              </div>
+              <div class="studio-panel-toolbar">
+                <span class="studio-chip" id="studio-active-node-chip">Node 1</span>
+                <button type="button" class="btn btn-sm btn-outline-info" id="studio-load-inspector">Load Inspector</button>
+              </div>
+            </div>
+
+            <div class="studio-inspector-layout">
+              <div class="studio-inspector-frame-wrap">
+                <iframe id="studio-inspector-frame" class="studio-inspector-frame" sandbox="allow-scripts"></iframe>
+              </div>
+              <div class="studio-inspector-sidebar">
+                <div class="studio-inspector-summary" id="studio-inspector-summary">
+                  Inspector snapshot has not been loaded yet.
+                </div>
+                <div class="studio-inspector-candidates" id="studio-inspector-candidates"></div>
+              </div>
+            </div>
+          </section>
+        </section>
+
+        <section class="glass-panel studio-panel studio-side-panel">
+          <div class="studio-panel-head">
+            <div>
+              <p class="studio-panel-kicker">Draft payload</p>
+              <h3>Live workspace schema</h3>
+            </div>
+            <span class="studio-chip">JSON-first</span>
+          </div>
+          <pre class="studio-json" id="studio-json-output">{{ studio_state | tojson(indent=2) }}</pre>
+        </section>
+      </div>
+
+      <div class="studio-lower-grid">
+        <section class="glass-panel studio-panel studio-flow-panel">
+          <div class="studio-panel-head">
+            <div>
+              <p class="studio-panel-kicker">Flow blueprint</p>
+              <h3>Editable nodes</h3>
+            </div>
+            <div class="studio-panel-toolbar">
+              <span class="studio-chip" id="studio-node-count">{{ studio_state.flow.nodes|length }} nodes</span>
+              <button type="button" class="btn btn-sm btn-outline-info" id="studio-add-node">Add Node</button>
+            </div>
+          </div>
+          <div class="studio-flow-list studio-flow-editor" id="studio-flow-list"></div>
+        </section>
+
+        <section class="glass-panel studio-panel studio-events-panel">
+          <div class="studio-panel-head">
+            <div>
+              <p class="studio-panel-kicker">Run event ledger</p>
+              <h3>Debugger foundation</h3>
+            </div>
+            <span class="studio-chip">{{ studio_state.run.event_schema|length }} event types</span>
+          </div>
+          <div class="studio-event-list" id="studio-event-list"></div>
+          <div class="studio-template-strip">
+            {% for template in studio_state.templates %}
+            <article class="studio-template-card">
+              <strong>{{ template.title }}</strong>
+              <p>{{ template.description }}</p>
+            </article>
+            {% endfor %}
+          </div>
+          <section class="studio-memory-shell">
+            <div class="studio-panel-head">
+              <div>
+                <p class="studio-panel-kicker">Selector memory</p>
+                <h3>Recent healing wins for this domain</h3>
+              </div>
+              <button type="button" class="btn btn-sm btn-outline-info" id="studio-refresh-memory">Refresh Memory</button>
+            </div>
+            <div class="studio-memory-note" id="studio-memory-note">{{ studio_state.healing.memory_note }}</div>
+            <div class="studio-memory-list" id="studio-memory-list"></div>
+          </section>
+        </section>
+      </div>
+    </main>
+
+    <script id="studio-state-json" type="application/json">{{ studio_state | tojson }}</script>
+    <script id="studio-catalog-json" type="application/json">{{ studio_catalog | tojson }}</script>
+    <script>
+      const studioState = JSON.parse(document.getElementById('studio-state-json').textContent);
+      const studioCatalog = JSON.parse(document.getElementById('studio-catalog-json').textContent);
+      const cachedPreviewMethods = new Set(['py_requests', 'py_llm']);
+      let previewCachePromise = null;
+
+      const methodDetail = document.getElementById('studio-method-detail');
+      const flowList = document.getElementById('studio-flow-list');
+      const previewMode = document.getElementById('studio-preview-mode');
+      const nodeCount = document.getElementById('studio-node-count');
+      const methodCards = document.querySelectorAll('.studio-method-card');
+      const titleHeading = document.getElementById('studio-title-heading');
+      const taskNameInput = document.getElementById('studio-task-name');
+      const targetUrlInput = document.getElementById('studio-target-url');
+      const notificationEmailInput = document.getElementById('studio-noti-email');
+      const previewHeadline = document.getElementById('studio-preview-headline');
+      const previewStatus = document.getElementById('studio-preview-status');
+      const previewTitle = document.getElementById('studio-preview-title');
+      const previewTarget = document.getElementById('studio-preview-target');
+      const previewDetail = document.getElementById('studio-preview-detail');
+      const previewResult = document.getElementById('studio-preview-result');
+      const previewMethodName = document.getElementById('studio-preview-method-name');
+      const eventList = document.getElementById('studio-event-list');
+      const feedback = document.getElementById('studio-feedback');
+      const jsonOutput = document.getElementById('studio-json-output');
+      const primePreviewButton = document.getElementById('studio-prime-preview');
+      const runPreviewButton = document.getElementById('studio-run-preview');
+      const saveTaskButton = document.getElementById('studio-save-task');
+      const addNodeButton = document.getElementById('studio-add-node');
+      const loadInspectorButton = document.getElementById('studio-load-inspector');
+      const activeNodeChip = document.getElementById('studio-active-node-chip');
+      const inspectorFrame = document.getElementById('studio-inspector-frame');
+      const inspectorSummary = document.getElementById('studio-inspector-summary');
+      const inspectorCandidates = document.getElementById('studio-inspector-candidates');
+      const copilotGoalInput = document.getElementById('studio-copilot-goal');
+      const copilotSourceChip = document.getElementById('studio-copilot-source');
+      const runCopilotButton = document.getElementById('studio-run-copilot');
+      const applyCopilotButton = document.getElementById('studio-apply-copilot');
+      const copilotNote = document.getElementById('studio-copilot-note');
+      const copilotList = document.getElementById('studio-copilot-list');
+      const refreshMemoryButton = document.getElementById('studio-refresh-memory');
+      const memoryNote = document.getElementById('studio-memory-note');
+      const memoryList = document.getElementById('studio-memory-list');
+
+      function escapeHtml(value) {
+        return String(value)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      function getCurrentMethodDefinition() {
+        return studioCatalog[studioState.selected_method];
+      }
+
+      function getSelectedNodeIndex() {
+        if (!studioState.flow.nodes.length) {
+          return 0;
+        }
+        if (studioState.inspector.selected_node_index >= studioState.flow.nodes.length) {
+          studioState.inspector.selected_node_index = studioState.flow.nodes.length - 1;
+        }
+        if (studioState.inspector.selected_node_index < 0) {
+          studioState.inspector.selected_node_index = 0;
+        }
+        return studioState.inspector.selected_node_index;
+      }
+
+      function getSelectedNode() {
+        return studioState.flow.nodes[getSelectedNodeIndex()] || null;
+      }
+
+      function setSelectedNodeIndex(index, rerenderFlow) {
+        studioState.inspector.selected_node_index = Math.max(0, Math.min(index, studioState.flow.nodes.length - 1));
+        if (rerenderFlow !== false) {
+          renderFlowEditor();
+        }
+        renderInspectorPanel();
+        renderDraftJson();
+      }
+
+      function getStepDefinition(stepName) {
+        return getCurrentMethodDefinition().step_cards.find((step) => step.step === stepName) || getCurrentMethodDefinition().step_cards[0];
+      }
+
+      function cloneStarterNodes(methodKey) {
+        return JSON.parse(JSON.stringify(studioCatalog[methodKey].starter_nodes));
+      }
+
+      function pushEvent(type, title, detail, level) {
+        studioState.run.events.unshift({ type, title, detail, level });
+        studioState.run.events = studioState.run.events.slice(0, 8);
+        renderEventLedger();
+        renderDraftJson();
+      }
+
+      function setFeedback(message, tone, allowHtml) {
+        feedback.className = 'studio-feedback studio-feedback-' + (tone || 'info');
+        if (allowHtml) {
+          feedback.innerHTML = message;
+        } else {
+          feedback.textContent = message;
+        }
+      }
+
+      function clearFeedback() {
+        feedback.className = 'studio-feedback studio-feedback-hidden';
+        feedback.textContent = '';
+      }
+
+      function setButtonBusy(button, isBusy, busyLabel) {
+        if (isBusy) {
+          button.dataset.label = button.textContent;
+          button.textContent = busyLabel;
+          button.disabled = true;
+          return;
+        }
+
+        button.textContent = button.dataset.label || button.textContent;
+        button.disabled = false;
+      }
+
+      function renderDraftJson() {
+        jsonOutput.textContent = JSON.stringify(studioState, null, 2);
+      }
+
+      function getApplyConfig(candidateKind) {
+        if (studioState.selected_method === 'py_llm') {
+          return null;
+        }
+
+        if (candidateKind === 'xpath' && (studioState.selected_method === 'py_selenium' || studioState.selected_method === 'py_playwright')) {
+          return { step: 'find_element_by_xpath', label: 'Apply as XPath locator' };
+        }
+
+        if (candidateKind === 'css' || candidateKind === 'attribute') {
+          if (studioState.selected_method === 'py_requests') {
+            return { step: 'select_one', label: 'Apply as CSS selector' };
+          }
+          return { step: 'find_element_by_css', label: 'Apply as CSS locator' };
+        }
+
+        return null;
+      }
+
+      function renderInspectorPanel() {
+        const selectedNode = getSelectedNode();
+        const selection = studioState.inspector.selection;
+        const applyUnsupported = studioState.selected_method === 'py_llm';
+
+        activeNodeChip.textContent = selectedNode ? 'Node ' + (getSelectedNodeIndex() + 1) + ': ' + selectedNode.title : 'No node selected';
+
+        const summaryParts = [
+          '<strong>Inspector status:</strong> ' + escapeHtml(studioState.inspector.status || 'idle'),
+          '<div>' + escapeHtml(studioState.inspector.source_note || 'Load a snapshot to start selecting elements.') + '</div>',
+        ];
+
+        if (selection && selection.tag) {
+          summaryParts.push('<div><strong>Selected tag:</strong> ' + escapeHtml(selection.tag) + '</div>');
+        }
+        if (selection && selection.text) {
+          summaryParts.push('<div><strong>Visible text:</strong> ' + escapeHtml(selection.text) + '</div>');
+        }
+        if (selection && selection.html) {
+          summaryParts.push('<div><strong>HTML hint:</strong> ' + escapeHtml(selection.html) + '</div>');
+        }
+        if (applyUnsupported) {
+          summaryParts.push('<div><strong>Note:</strong> LLM mode can inspect the page, but selector candidates are only directly applicable in Requests, Selenium, or Playwright flows.</div>');
+        }
+
+        inspectorSummary.innerHTML = summaryParts.join('');
+
+        if (!selection || !selection.candidates || !selection.candidates.length) {
+          inspectorCandidates.innerHTML = '<div class="studio-empty-state">Click an element inside the inspector snapshot to generate selector candidates.</div>';
+          return;
+        }
+
+        inspectorCandidates.innerHTML = selection.candidates.map((candidate, index) => {
+          const applyConfig = getApplyConfig(candidate.kind);
+          const canApply = Boolean(applyConfig);
+          return '<article class="studio-inspector-card">'
+            + '<div class="studio-inspector-card-head">'
+            + '<strong>' + escapeHtml(candidate.label) + '</strong>'
+            + '<span>' + escapeHtml(candidate.kind) + '</span>'
+            + '</div>'
+            + '<code>' + escapeHtml(candidate.preview || candidate.value) + '</code>'
+            + '<div class="studio-inspector-actions">'
+            + (canApply
+              ? '<button type="button" class="btn btn-sm btn-info" data-action="apply-candidate" data-candidate-index="' + index + '">' + escapeHtml(applyConfig.label) + '</button>'
+              : '<span class="studio-inspector-note">Read-only for this method</span>')
+            + '</div>'
+            + '</article>';
+        }).join('');
+      }
+
+      function renderMemoryPanel() {
+        const healing = studioState.healing || { memory_items: [], memory_note: '' };
+        memoryNote.textContent = healing.memory_note || 'Run previews or successful crawls to build selector memory for this domain.';
+
+        if (!healing.memory_items || !healing.memory_items.length) {
+          memoryList.innerHTML = '<div class="studio-empty-state">No selector memory for the current domain and method yet.</div>';
+          return;
+        }
+
+        memoryList.innerHTML = healing.memory_items.map((item) => {
+          return '<article class="studio-memory-card">'
+            + '<div class="studio-memory-card-head">'
+            + '<strong>' + escapeHtml(item.step_name) + '</strong>'
+            + '<span>' + escapeHtml(item.strategy) + '</span>'
+            + '</div>'
+            + '<code>' + escapeHtml(item.source_param) + '</code>'
+            + '<div class="studio-memory-arrow">→</div>'
+            + '<code>' + escapeHtml(item.resolved_param) + '</code>'
+            + '<div class="studio-memory-meta">'
+            + '<span>Successes: ' + escapeHtml(item.success_count) + '</span>'
+            + '<span>' + escapeHtml(item.last_seen_at || '') + '</span>'
+            + '</div>'
+            + '</article>';
+        }).join('');
+      }
+
+      function renderCopilotPanel() {
+        const copilot = studioState.copilot || {};
+        if (copilotGoalInput.value !== (copilot.goal || '')) {
+          copilotGoalInput.value = copilot.goal || '';
+        }
+
+        copilotSourceChip.textContent = copilot.source || 'template';
+        copilotNote.textContent = copilot.note || 'Describe the data you want and Copilot will draft a flow for the currently selected runtime.';
+
+        const suggestion = copilot.suggestion;
+        const hasSuggestion = Boolean(suggestion && suggestion.nodes && suggestion.nodes.length);
+        applyCopilotButton.disabled = !hasSuggestion;
+
+        if (!hasSuggestion) {
+          copilotList.innerHTML = '<div class="studio-empty-state">No suggestion yet. Add a target URL, describe the data you want, then generate a draft flow.</div>';
+          return;
+        }
+
+        copilotList.innerHTML = '<article class="studio-copilot-summary">'
+          + '<div class="studio-copilot-summary-head">'
+          + '<strong>' + escapeHtml(suggestion.task_name || 'Studio Copilot Flow') + '</strong>'
+          + '<span>' + escapeHtml(suggestion.source || copilot.source || 'template') + (suggestion.memory_hits ? ' / ' + escapeHtml(suggestion.memory_hits + ' memory hits') : '') + '</span>'
+          + '</div>'
+          + '<p>' + escapeHtml(suggestion.headline || 'Copilot drafted a new flow suggestion.') + '</p>'
+          + '<p>' + escapeHtml(suggestion.rationale || copilot.note || '') + '</p>'
+          + '<div class="studio-copilot-node-list">'
+          + suggestion.nodes.map((node, index) => {
+            return '<article class="studio-copilot-node">'
+              + '<div class="studio-copilot-node-head">'
+              + '<strong>' + escapeHtml((index + 1) + '. ' + node.title) + '</strong>'
+              + '<span>' + escapeHtml(node.step) + '</span>'
+              + '</div>'
+              + '<code>' + escapeHtml(node.args) + '</code>'
+              + '<p>' + escapeHtml(node.intent) + '</p>'
+              + '</article>';
+          }).join('')
+          + '</div>'
+          + '</article>';
+      }
+
+      function renderEventLedger() {
+        eventList.innerHTML = studioState.run.events.map((event) => {
+          return '<article class="studio-event-item studio-level-' + escapeHtml(event.level) + '">'
+            + '<strong>' + escapeHtml(event.title) + '</strong>'
+            + '<span>' + escapeHtml(event.type) + '</span>'
+            + '<p>' + escapeHtml(event.detail) + '</p>'
+            + '</article>';
+        }).join('');
+      }
+
+      function renderMethodDetail() {
+        const method = getCurrentMethodDefinition();
+        methodCards.forEach((card) => {
+          card.classList.toggle('is-active', card.dataset.method === studioState.selected_method);
+        });
+
+        methodDetail.innerHTML = [
+          '<div class="studio-method-focus">',
+          '<div>',
+          '<p class="studio-panel-kicker">Active runtime</p>',
+          '<h4>' + escapeHtml(method.label) + '</h4>',
+          '<p>' + escapeHtml(method.summary) + '</p>',
+          '</div>',
+          '<div class="studio-strengths">' + method.strengths.map((strength) => '<span>' + escapeHtml(strength) + '</span>').join('') + '</div>',
+          '</div>',
+          '<div class="studio-step-card-grid">' + method.step_cards.slice(0, 6).map((step) => {
+            return '<article class="studio-step-card">'
+              + '<strong>' + escapeHtml(step.label) + '</strong>'
+              + '<span>' + escapeHtml(step.group) + '</span>'
+              + '<code>' + escapeHtml(step.step) + '</code>'
+              + '<p>' + escapeHtml(step.description) + '</p>'
+              + '</article>';
+          }).join('') + '</div>'
+        ].join('');
+      }
+
+      function renderPreviewPanel() {
+        const method = getCurrentMethodDefinition();
+        titleHeading.textContent = studioState.workspace.title || 'Untitled Studio Flow';
+        previewMode.textContent = method.preview_mode;
+        previewMethodName.textContent = method.label;
+        previewHeadline.textContent = studioState.preview.headline;
+        previewStatus.textContent = studioState.preview.status;
+        previewTitle.textContent = studioState.workspace.target_url ? 'Preview surface for ' + method.label : 'URL and preview cache will appear here';
+        previewTarget.textContent = studioState.workspace.target_url || 'No target URL yet';
+        previewDetail.textContent = studioState.preview.detail;
+        previewResult.textContent = studioState.preview.last_result || 'No preview run yet. Prime cache for Requests / LLM, or run a live browser preview for Selenium / Playwright.';
+      }
+
+      function buildStepOptions(selectedStep) {
+        return getCurrentMethodDefinition().step_cards.map((step) => {
+          return '<option value="' + escapeHtml(step.step) + '"' + (step.step === selectedStep ? ' selected' : '') + '>'
+            + escapeHtml(step.label) + ' (' + escapeHtml(step.group) + ')</option>';
+        }).join('');
+      }
+
+      function renderFlowEditor() {
+        nodeCount.textContent = studioState.flow.nodes.length + ' nodes';
+        flowList.innerHTML = studioState.flow.nodes.map((node, index) => {
+          const stepMeta = getStepDefinition(node.step);
+          const isActive = index === getSelectedNodeIndex();
+          return '<article class="studio-editor-node' + (isActive ? ' is-active' : '') + '" data-index="' + index + '">'
+            + '<div class="studio-editor-header">'
+            + '<span class="studio-flow-index">' + (index + 1) + '</span>'
+            + '<div class="studio-node-actions">'
+            + '<span class="studio-chip">' + (isActive ? 'Active target' : 'Pick target') + '</span>'
+            + '<button type="button" class="btn btn-sm btn-outline-danger" data-action="remove-node"' + (studioState.flow.nodes.length === 1 ? ' disabled' : '') + '>Remove</button>'
+            + '</div>'
+            + '</div>'
+            + '<div class="studio-editor-grid">'
+            + '<label class="studio-field">'
+            + '<span>Node title</span>'
+            + '<input type="text" class="form-control" data-field="title" value="' + escapeHtml(node.title) + '">'
+            + '</label>'
+            + '<label class="studio-field">'
+            + '<span>Step</span>'
+            + '<select class="form-control" data-field="step">' + buildStepOptions(node.step) + '</select>'
+            + '</label>'
+            + '<label class="studio-field studio-field-span-2">'
+            + '<span>Arguments</span>'
+            + '<input type="text" class="form-control" data-field="args" placeholder="' + escapeHtml(stepMeta.param_hint || '-') + '" value="' + escapeHtml(node.args) + '">'
+            + '</label>'
+            + '<label class="studio-field studio-field-span-2">'
+            + '<span>Intent</span>'
+            + '<input type="text" class="form-control" data-field="intent" value="' + escapeHtml(node.intent) + '">'
+            + '</label>'
+            + '</div>'
+            + '<p class="studio-node-hint">' + escapeHtml(stepMeta.description) + '</p>'
+            + '</article>';
+        }).join('');
+      }
+
+      function syncWorkspaceState() {
+        const previousTargetUrl = studioState.workspace.target_url;
+        studioState.workspace.title = taskNameInput.value.trim() || 'Untitled Studio Flow';
+        studioState.workspace.target_url = targetUrlInput.value.trim();
+        studioState.workspace.notification_email = notificationEmailInput.value.trim();
+
+        if (previousTargetUrl !== studioState.workspace.target_url) {
+          studioState.healing.memory_status = 'idle';
+          studioState.healing.memory_note = 'Run previews or successful crawls to build selector memory for this domain.';
+          studioState.healing.memory_items = [];
+          studioState.copilot.status = 'idle';
+          studioState.copilot.source = 'template';
+          studioState.copilot.note = 'Target URL changed. Generate a fresh copilot plan for the new surface.';
+          studioState.copilot.suggestion = null;
+          renderMemoryPanel();
+          renderCopilotPanel();
+        }
+
+        if (studioState.workspace.target_url) {
+          studioState.preview.headline = 'Workspace is configured for ' + studioState.selected_method;
+          studioState.preview.detail = 'Use Prime Preview for cached methods or run the flow directly for browser runtimes.';
+        } else {
+          studioState.preview.headline = 'Preview stage is waiting for a target URL';
+          studioState.preview.detail = 'Add a target URL before warming the cache or running a preview.';
+        }
+
+        renderPreviewPanel();
+        renderDraftJson();
+      }
+
+      function createNode(stepName) {
+        const stepMeta = getStepDefinition(stepName || getCurrentMethodDefinition().step_cards[0].step);
+        return {
+          id: 'node-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+          title: stepMeta.label,
+          step: stepMeta.step,
+          args: stepMeta.param_hint === '-' ? '-' : '',
+          intent: stepMeta.description,
+        };
+      }
+
+      function validateDraft() {
+        if (!studioState.workspace.target_url || !/^https?:\/\//i.test(studioState.workspace.target_url)) {
+          throw new Error('Target URL must start with http:// or https://');
+        }
+        if (!studioState.workspace.notification_email || studioState.workspace.notification_email.indexOf('@') === -1) {
+          throw new Error('Notification email is required');
+        }
+        if (!studioState.flow.nodes.length) {
+          throw new Error('At least one flow node is required');
+        }
+        studioState.flow.nodes.forEach((node, index) => {
+          const stepMeta = getStepDefinition(node.step);
+          if (stepMeta.param_hint !== '-' && (!node.args || node.args.trim() === '' || node.args.trim() === '-')) {
+            throw new Error('Flow node ' + (index + 1) + ' requires an argument for ' + stepMeta.label);
+          }
+        });
+      }
+
+      function buildStudioPayload() {
+        syncWorkspaceState();
+        validateDraft();
+        return {
+          draft_id: studioState.draft_id,
+          task_name: studioState.workspace.title,
+          url: studioState.workspace.target_url,
+          noti_email: studioState.workspace.notification_email,
+          c_method: studioState.selected_method,
+          nodes: studioState.flow.nodes.map((node) => ({
+            id: node.id,
+            title: node.title,
+            step: node.step,
+            args: node.args,
+            intent: node.intent,
+          })),
+        };
+      }
+
+      function buildPreviewPayload() {
+        const payload = buildStudioPayload();
+        return {
+          preview_id: studioState.preview.preview_id,
+          url: payload.url,
+          c_method: payload.c_method,
+          steps: payload.nodes.map((node) => node.step),
+          args: payload.nodes.map((node) => node.args || '-'),
+        };
+      }
+
+      async function parseResponse(response) {
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.indexOf('application/json') !== -1) {
+          return response.json();
+        }
+        return response.text();
+      }
+
+      async function primePreviewCache(forceRefresh) {
+        const payload = buildPreviewPayload();
+        if (!cachedPreviewMethods.has(payload.c_method)) {
+          studioState.preview.status = 'live';
+          studioState.preview.headline = 'Live browser preview selected';
+          studioState.preview.detail = 'Browser methods use the live preview pipeline and do not need HTML cache warmup.';
+          pushEvent('preview.live_ready', 'Live preview selected', 'Studio will run the current nodes directly against a live browser runtime.', 'info');
+          renderPreviewPanel();
+          return 'live-preview';
+        }
+
+        if (previewCachePromise && !forceRefresh) {
+          return previewCachePromise;
+        }
+
+        studioState.preview.status = 'warming';
+        studioState.preview.headline = 'Caching preview surface';
+        studioState.preview.detail = 'Fetching the latest HTML snapshot for Requests / LLM preview.';
+        renderPreviewPanel();
+        pushEvent('preview.cache_requested', 'Preview cache requested', 'Studio asked the existing cache pipeline to refresh the preview surface.', 'info');
+
+        previewCachePromise = fetch("{{ url_for('temphtml') }}", {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            preview_id: studioState.preview.preview_id,
+            url: payload.url,
+            c_method: payload.c_method,
+          }),
+        })
+          .then(async (response) => {
+            const body = await parseResponse(response);
+            if (!response.ok) {
+              throw new Error(typeof body === 'string' ? body : body.message);
+            }
+
+            studioState.preview.status = 'ready';
+            studioState.preview.headline = 'Preview cache primed';
+            studioState.preview.detail = 'Cached HTML is ready for Studio preview runs.';
+            pushEvent('preview.cached', 'Preview cache primed', 'Studio refreshed the preview cache for the current draft.', 'success');
+            clearFeedback();
+            return body;
+          })
+          .catch((error) => {
+            studioState.preview.status = 'error';
+            studioState.preview.headline = 'Preview cache failed';
+            studioState.preview.detail = error.message;
+            pushEvent('preview.cache_failed', 'Preview cache failed', error.message, 'danger');
+            setFeedback(error.message, 'danger');
+            throw error;
+          })
+          .finally(() => {
+            previewCachePromise = null;
+            renderPreviewPanel();
+            renderDraftJson();
+          });
+
+        return previewCachePromise;
+      }
+
+      async function runPreview() {
+        setButtonBusy(runPreviewButton, true, 'Running...');
+        clearFeedback();
+
+        try {
+          const payload = buildPreviewPayload();
+          if (cachedPreviewMethods.has(payload.c_method)) {
+            await primePreviewCache(false);
+          }
+
+          studioState.preview.status = 'running';
+          studioState.preview.headline = 'Running preview flow';
+          studioState.preview.detail = 'Executing the current flow nodes against the preview pipeline.';
+          renderPreviewPanel();
+          pushEvent('flow.node_started', 'Preview execution started', 'Studio sent the current node stack into the preview runtime.', 'info');
+
+          const response = await fetch("{{ url_for('preview') }}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          const body = await parseResponse(response);
+          const resultText = typeof body === 'string' ? body : JSON.stringify(body, null, 2);
+          if (!response.ok) {
+            throw new Error(resultText || 'Preview failed');
+          }
+
+          studioState.preview.status = 'ready';
+          studioState.preview.headline = 'Preview completed';
+          studioState.preview.detail = 'Preview returned a payload for the current flow nodes.';
+          studioState.preview.last_result = resultText;
+          pushEvent('run.completed', 'Preview completed', 'Studio received a preview payload from the current runtime.', 'success');
+          setFeedback('Preview completed successfully.', 'success');
+          await loadSelectorMemory();
+        } catch (error) {
+          studioState.preview.status = 'error';
+          studioState.preview.headline = 'Preview failed';
+          studioState.preview.detail = error.message;
+          studioState.preview.last_result = error.message;
+          pushEvent('flow.node_failed', 'Preview failed', error.message, 'danger');
+          setFeedback(error.message, 'danger');
+        } finally {
+          setButtonBusy(runPreviewButton, false);
+          renderPreviewPanel();
+          renderDraftJson();
+        }
+      }
+
+      async function loadInspector(forceRefresh) {
+        setButtonBusy(loadInspectorButton, true, 'Loading...');
+        clearFeedback();
+
+        try {
+          syncWorkspaceState();
+          if (!studioState.workspace.target_url || !/^https?:\/\//i.test(studioState.workspace.target_url)) {
+            throw new Error('Target URL must start with http:// or https://');
+          }
+
+          const response = await fetch("{{ url_for('studio_inspector') }}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              preview_id: studioState.preview.preview_id,
+              url: studioState.workspace.target_url,
+              c_method: studioState.selected_method,
+              force_refresh: Boolean(forceRefresh),
+            }),
+          });
+          const body = await parseResponse(response);
+          if (!response.ok) {
+            throw new Error((body && body.message) || 'Inspector load failed');
+          }
+
+          inspectorFrame.srcdoc = body.html;
+          studioState.inspector.status = 'ready';
+          studioState.inspector.source_mode = body.source_mode;
+          studioState.inspector.source_note = body.note;
+          studioState.inspector.selection = null;
+          pushEvent('inspector.loaded', 'Inspector snapshot loaded', 'Studio loaded a clickable snapshot for DOM inspection.', 'success');
+          setFeedback('Inspector snapshot loaded. Click an element in the frame to generate selector candidates.', 'success');
+        } catch (error) {
+          studioState.inspector.status = 'error';
+          studioState.inspector.source_note = error.message;
+          studioState.inspector.selection = null;
+          pushEvent('inspector.failed', 'Inspector load failed', error.message, 'danger');
+          setFeedback(error.message, 'danger');
+        } finally {
+          setButtonBusy(loadInspectorButton, false);
+          renderInspectorPanel();
+          renderDraftJson();
+        }
+      }
+
+      async function loadSelectorMemory() {
+        if (studioState.selected_method === 'py_llm') {
+          studioState.healing.memory_status = 'unsupported';
+          studioState.healing.memory_note = 'Selector memory is used for step-based methods. Switch to Requests, Selenium, or Playwright to build healing history.';
+          studioState.healing.memory_items = [];
+          renderMemoryPanel();
+          renderDraftJson();
+          return;
+        }
+
+        if (!studioState.workspace.target_url || !/^https?:\/\//i.test(studioState.workspace.target_url)) {
+          studioState.healing.memory_status = 'idle';
+          studioState.healing.memory_note = 'Add a target URL before querying selector memory.';
+          studioState.healing.memory_items = [];
+          renderMemoryPanel();
+          renderDraftJson();
+          return;
+        }
+
+        setButtonBusy(refreshMemoryButton, true, 'Loading...');
+
+        try {
+          const response = await fetch("{{ url_for('studio_selector_memory') }}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              url: studioState.workspace.target_url,
+              c_method: studioState.selected_method,
+            }),
+          });
+          const body = await parseResponse(response);
+          if (!response.ok) {
+            throw new Error((body && body.message) || 'Selector memory load failed');
+          }
+
+          studioState.healing.memory_status = 'ready';
+          studioState.healing.memory_items = body.items || [];
+          studioState.healing.memory_note = studioState.healing.memory_items.length
+            ? 'Selector memory is now influencing Auto-Healing 2.0 before LLM fallback.'
+            : 'No stored selector memory for this domain and method yet. Successful previews will populate it.';
+        } catch (error) {
+          studioState.healing.memory_status = 'error';
+          studioState.healing.memory_items = [];
+          studioState.healing.memory_note = error.message;
+          setFeedback(error.message, 'danger');
+        } finally {
+          setButtonBusy(refreshMemoryButton, false);
+          renderMemoryPanel();
+          renderDraftJson();
+        }
+      }
+
+      async function loadCopilotSuggestion() {
+        setButtonBusy(runCopilotButton, true, 'Thinking...');
+        clearFeedback();
+
+        try {
+          syncWorkspaceState();
+          const goal = copilotGoalInput.value.trim();
+          if (!goal) {
+            throw new Error('Copilot goal is required');
+          }
+          if (!studioState.workspace.target_url || !/^https?:\/\//i.test(studioState.workspace.target_url)) {
+            throw new Error('Target URL must start with http:// or https://');
+          }
+
+          studioState.copilot.goal = goal;
+          studioState.copilot.status = 'thinking';
+          studioState.copilot.note = 'Copilot is drafting a flow from the current goal, method, and target URL.';
+          studioState.copilot.suggestion = null;
+          renderCopilotPanel();
+
+          const response = await fetch("{{ url_for('studio_copilot') }}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              goal: goal,
+              url: studioState.workspace.target_url,
+              c_method: studioState.selected_method,
+              nodes: studioState.flow.nodes,
+            }),
+          });
+          const body = await parseResponse(response);
+          if (!response.ok) {
+            throw new Error((body && body.message) || 'Copilot failed to generate a flow');
+          }
+
+          studioState.copilot.status = 'ready';
+          studioState.copilot.source = body.source || 'template';
+          studioState.copilot.note = body.rationale || 'Copilot drafted a flow suggestion for the current goal.';
+          studioState.copilot.suggestion = body;
+          pushEvent(
+            'copilot.generated',
+            'Copilot suggestion generated',
+            body.source === 'llm'
+              ? 'Studio drafted a Gemini-assisted starter flow for the requested goal.'
+              : 'Studio drafted a template-based starter flow because deterministic planning was the best available path.',
+            body.source === 'llm' ? 'success' : 'info'
+          );
+          setFeedback('Copilot generated a flow suggestion.', 'success');
+        } catch (error) {
+          studioState.copilot.status = 'error';
+          studioState.copilot.note = error.message;
+          studioState.copilot.suggestion = null;
+          setFeedback(error.message, 'danger');
+        } finally {
+          setButtonBusy(runCopilotButton, false);
+          renderCopilotPanel();
+          renderDraftJson();
+        }
+      }
+
+      function applyCopilotSuggestion() {
+        const suggestion = studioState.copilot && studioState.copilot.suggestion;
+        if (!suggestion || !suggestion.nodes || !suggestion.nodes.length) {
+          setFeedback('Generate a copilot suggestion before applying it.', 'warning');
+          return;
+        }
+
+        studioState.flow.nodes = suggestion.nodes.map((node, index) => ({
+          id: node.id || ('copilot-node-' + (index + 1)),
+          title: node.title,
+          step: node.step,
+          args: node.args,
+          intent: node.intent,
+        }));
+        studioState.workspace.title = suggestion.task_name || studioState.workspace.title;
+        taskNameInput.value = studioState.workspace.title;
+        studioState.inspector.selected_node_index = 0;
+        studioState.inspector.selection = null;
+        studioState.copilot.status = 'applied';
+        studioState.copilot.note = 'Suggestion applied. Refine selectors in the flow editor or inspector before saving the task.';
+
+        pushEvent(
+          'copilot.applied',
+          'Copilot suggestion applied',
+          'Studio replaced the current blueprint with the copilot draft so you can refine it in place.',
+          'success'
+        );
+        setFeedback('Copilot suggestion applied to the flow editor.', 'success');
+        renderFlowEditor();
+        renderPreviewPanel();
+        renderInspectorPanel();
+        renderCopilotPanel();
+        renderDraftJson();
+      }
+
+      function applyInspectorCandidate(candidateIndex) {
+        const selection = studioState.inspector.selection;
+        const candidate = selection && selection.candidates ? selection.candidates[candidateIndex] : null;
+        if (!candidate) {
+          return;
+        }
+
+        const applyConfig = getApplyConfig(candidate.kind);
+        if (!applyConfig) {
+          setFeedback('This selector type cannot be applied to the current method.', 'warning');
+          return;
+        }
+
+        const targetNode = getSelectedNode();
+        if (!targetNode) {
+          setFeedback('Select a flow node before applying a selector.', 'warning');
+          return;
+        }
+
+        targetNode.step = applyConfig.step;
+        targetNode.args = candidate.value;
+        targetNode.title = 'Locate ' + (selection.tag || 'element');
+        targetNode.intent = 'Applied from inspector candidate: ' + candidate.label;
+        pushEvent('inspector.applied', 'Selector applied to flow node', 'Studio mapped ' + candidate.label + ' into the active flow node.', 'success');
+        setFeedback('Applied ' + candidate.label + ' to the active flow node.', 'success');
+        renderFlowEditor();
+        renderInspectorPanel();
+        renderDraftJson();
+      }
+
+      async function saveTask() {
+        setButtonBusy(saveTaskButton, true, 'Saving...');
+        clearFeedback();
+
+        try {
+          const payload = buildStudioPayload();
+          const response = await fetch("{{ url_for('studio_task') }}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          const body = await parseResponse(response);
+          if (!response.ok && response.status !== 202) {
+            throw new Error((body && body.message) || 'Studio save failed');
+          }
+
+          const message = escapeHtml(body.message || 'Studio task saved.');
+          const redirectUrl = escapeHtml(body.redirect_url || '{{ url_for('contents') }}');
+          const level = body.status === 'queued' ? 'success' : 'warning';
+          pushEvent('task.saved', 'Studio task saved', message, level === 'success' ? 'success' : 'warning');
+          setFeedback(message + ' <a href="' + redirectUrl + '" class="studio-feedback-link">Open tasks</a>', level, true);
+        } catch (error) {
+          pushEvent('task.save_failed', 'Studio save failed', error.message, 'danger');
+          setFeedback(error.message, 'danger');
+        } finally {
+          setButtonBusy(saveTaskButton, false);
+          renderDraftJson();
+        }
+      }
+
+      methodCards.forEach((card) => {
+        card.addEventListener('click', () => {
+          if (card.dataset.method === studioState.selected_method) {
+            return;
+          }
+
+          studioState.selected_method = card.dataset.method;
+          studioState.flow.nodes = cloneStarterNodes(studioState.selected_method);
+          studioState.preview.preview_mode = getCurrentMethodDefinition().preview_mode;
+          studioState.preview.status = 'idle';
+          studioState.preview.last_result = '';
+          studioState.preview.headline = 'Method switched to ' + getCurrentMethodDefinition().label;
+          studioState.preview.detail = 'Starter nodes were reset to match the selected runtime.';
+          studioState.inspector.status = 'idle';
+          studioState.inspector.source_note = 'Load an inspector snapshot to pick elements and apply selectors to the active flow node.';
+          studioState.inspector.selection = null;
+          studioState.inspector.selected_node_index = 0;
+          studioState.copilot.status = 'idle';
+          studioState.copilot.source = 'template';
+          studioState.copilot.note = 'Method changed. Generate a new copilot plan tailored to the selected runtime.';
+          studioState.copilot.suggestion = null;
+          studioState.healing.memory_status = 'idle';
+          studioState.healing.memory_note = 'Run previews or successful crawls to build selector memory for this domain.';
+          studioState.healing.memory_items = [];
+          inspectorFrame.srcdoc = '';
+          pushEvent('workspace.method_changed', 'Method switched', 'Studio reset the flow blueprint for the newly selected runtime.', 'info');
+          renderMethodDetail();
+          renderFlowEditor();
+          renderPreviewPanel();
+          renderInspectorPanel();
+          renderCopilotPanel();
+          renderMemoryPanel();
+          renderDraftJson();
+          clearFeedback();
+        });
+      });
+
+      document.getElementById('studio-workspace-form').addEventListener('input', () => {
+        syncWorkspaceState();
+        clearFeedback();
+      });
+
+      copilotGoalInput.addEventListener('input', () => {
+        studioState.copilot.goal = copilotGoalInput.value;
+        if (studioState.copilot.suggestion) {
+          studioState.copilot.status = 'idle';
+          studioState.copilot.note = 'Goal changed. Generate a fresh copilot plan to match the updated request.';
+          studioState.copilot.suggestion = null;
+          renderCopilotPanel();
+          renderDraftJson();
+        }
+      });
+
+      flowList.addEventListener('input', (event) => {
+        const card = event.target.closest('.studio-editor-node');
+        if (!card) {
+          return;
+        }
+
+        const index = Number(card.dataset.index);
+        const field = event.target.dataset.field;
+        if (!Number.isInteger(index) || !field) {
+          return;
+        }
+
+        setSelectedNodeIndex(index, false);
+        studioState.flow.nodes[index][field] = event.target.value;
+        renderDraftJson();
+      });
+
+      flowList.addEventListener('change', (event) => {
+        const card = event.target.closest('.studio-editor-node');
+        if (!card || event.target.dataset.field !== 'step') {
+          return;
+        }
+
+        const index = Number(card.dataset.index);
+        setSelectedNodeIndex(index, false);
+        const previousStep = studioState.flow.nodes[index].step;
+        const stepMeta = getStepDefinition(event.target.value);
+        studioState.flow.nodes[index].step = stepMeta.step;
+        if (!studioState.flow.nodes[index].args || studioState.flow.nodes[index].args === '-') {
+          studioState.flow.nodes[index].args = stepMeta.param_hint === '-' ? '-' : '';
+        }
+        if (!studioState.flow.nodes[index].title || studioState.flow.nodes[index].title === getStepDefinition(previousStep).label) {
+          studioState.flow.nodes[index].title = stepMeta.label;
+        }
+        studioState.flow.nodes[index].intent = stepMeta.description;
+        renderFlowEditor();
+        renderDraftJson();
+      });
+
+      flowList.addEventListener('click', (event) => {
+        const card = event.target.closest('.studio-editor-node');
+        if (card) {
+          setSelectedNodeIndex(Number(card.dataset.index));
+        }
+
+        const actionButton = event.target.closest('[data-action]');
+        if (!actionButton) {
+          return;
+        }
+
+        const actionCard = actionButton.closest('.studio-editor-node');
+        const index = Number(actionCard.dataset.index);
+        if (actionButton.dataset.action === 'apply-candidate') {
+          applyInspectorCandidate(Number(actionButton.dataset.candidateIndex));
+          return;
+        }
+        if (actionButton.dataset.action === 'remove-node' && studioState.flow.nodes.length > 1) {
+          studioState.flow.nodes.splice(index, 1);
+          if (studioState.inspector.selected_node_index >= studioState.flow.nodes.length) {
+            studioState.inspector.selected_node_index = studioState.flow.nodes.length - 1;
+          }
+          pushEvent('flow.node_removed', 'Flow node removed', 'Studio removed a node from the current blueprint.', 'warning');
+          renderFlowEditor();
+          renderInspectorPanel();
+          renderDraftJson();
+        }
+      });
+
+      inspectorCandidates.addEventListener('click', (event) => {
+        const actionButton = event.target.closest('[data-action="apply-candidate"]');
+        if (!actionButton) {
+          return;
+        }
+        applyInspectorCandidate(Number(actionButton.dataset.candidateIndex));
+      });
+
+      window.addEventListener('message', (event) => {
+        if (!event.data || event.data.source !== 'crawla-studio-inspector') {
+          return;
+        }
+
+        const payload = event.data.payload || {};
+        if (payload.ready) {
+          studioState.inspector.status = 'armed';
+          studioState.inspector.source_note = 'Inspector snapshot is ready. Click any element in the frame to generate selector candidates.';
+          renderInspectorPanel();
+          renderDraftJson();
+          return;
+        }
+
+        studioState.inspector.status = 'selected';
+        studioState.inspector.selection = payload;
+        pushEvent('inspector.selected', 'Inspector element selected', 'Studio captured selector candidates from the clicked element.', 'info');
+        renderInspectorPanel();
+        renderDraftJson();
+      });
+
+      addNodeButton.addEventListener('click', () => {
+        studioState.flow.nodes.push(createNode());
+        studioState.inspector.selected_node_index = studioState.flow.nodes.length - 1;
+        pushEvent('flow.node_added', 'Flow node added', 'Studio appended a new node to the blueprint.', 'info');
+        renderFlowEditor();
+        renderInspectorPanel();
+        renderDraftJson();
+      });
+
+      primePreviewButton.addEventListener('click', async () => {
+        setButtonBusy(primePreviewButton, true, 'Priming...');
+        clearFeedback();
+        try {
+          await primePreviewCache(true);
+          if (cachedPreviewMethods.has(studioState.selected_method)) {
+            setFeedback('Preview cache primed successfully.', 'success');
+          }
+        } catch (error) {
+          setFeedback(error.message, 'danger');
+        } finally {
+          setButtonBusy(primePreviewButton, false);
+        }
+      });
+
+      runPreviewButton.addEventListener('click', runPreview);
+      saveTaskButton.addEventListener('click', saveTask);
+      loadInspectorButton.addEventListener('click', () => loadInspector(true));
+      runCopilotButton.addEventListener('click', loadCopilotSuggestion);
+      applyCopilotButton.addEventListener('click', applyCopilotSuggestion);
+      refreshMemoryButton.addEventListener('click', loadSelectorMemory);
+
+      renderMethodDetail();
+      renderPreviewPanel();
+      renderFlowEditor();
+      renderInspectorPanel();
+      renderCopilotPanel();
+      renderMemoryPanel();
+      renderEventLedger();
+      renderDraftJson();
+    </script>
+  </body>
+</html>
