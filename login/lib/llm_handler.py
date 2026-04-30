@@ -328,9 +328,36 @@ def get_gemini_response_with_retry(
             else:
                 raise
 
+
+def get_self_healing_format_hint(step_name: str) -> str:
+    if step_name in {'select_one', 'select_all'} or 'by_css' in step_name:
+        return 'Return a CSS selector string.'
+    if 'by_id' in step_name:
+        return 'Return only the raw id value without a leading #.'
+    if 'by_class' in step_name:
+        return 'Return only the raw class name without a leading dot.'
+    if 'by_xpath' in step_name:
+        return 'Return only an XPath expression.'
+    if 'by_tag' in step_name:
+        return 'Return only a tag name.'
+    if 'by_name' in step_name:
+        return 'Return only the raw name attribute value.'
+    if 'by_link_text' in step_name:
+        return 'Return only the exact visible link text.'
+    if 'by_partial_link' in step_name:
+        return 'Return only a partial visible link text snippet.'
+    if 'by_text' in step_name:
+        return 'Return only the visible text that should be searched.'
+    if 'by_role' in step_name:
+        return 'Return only the ARIA role name.'
+    if 'by_placeholder' in step_name:
+        return 'Return only the placeholder text.'
+    return f"Return only a replacement parameter compatible with the step '{step_name}'."
+
 def get_gemini_self_healing(step_name: str, failed_param: str, html_snippet: str) -> Optional[str]:
-    """Use LLM to fix broken CSS selectors."""
-    prompt = f"The web scraping step '{step_name}' failed using the parameter '{failed_param}'. Based on this HTML snippet, provide a working CSS selector to extract the likely intended data. ONLY return the new selector string, without markdown or explanation.\n\nHTML:\n{html_snippet}"
+    """Use LLM to fix broken step parameters for step-based extraction methods."""
+    format_hint = get_self_healing_format_hint(step_name)
+    prompt = f"The web scraping step '{step_name}' failed using the parameter '{failed_param}'. Based on this HTML snippet, provide a better replacement parameter for the SAME step so the scraper can retry. ONLY return the replacement parameter, without markdown or explanation. {format_hint}\n\nHTML:\n{html_snippet}"
     try:
         res = get_gemini_response(prompt)
         return res.strip().strip('`').strip()

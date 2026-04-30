@@ -11,6 +11,7 @@ if str(ROOT) not in sys.path:
 from login.lib.llm_handler import (
     extract_gemini_response_text,
     get_gemini_smart_extraction,
+    get_self_healing_format_hint,
     get_llm_thinking_level,
     normalize_llm_output,
     parse_json_output,
@@ -50,6 +51,18 @@ class LlmHandlerTests(unittest.TestCase):
         result = '{"title": "Crawla"}'
 
         self.assertEqual(parse_json_output(result), {'title': 'Crawla'})
+
+    def test_get_self_healing_format_hint_for_id_step(self):
+        self.assertEqual(
+            get_self_healing_format_hint('find_element_by_id'),
+            'Return only the raw id value without a leading #.',
+        )
+
+    def test_get_self_healing_format_hint_for_css_step(self):
+        self.assertEqual(
+            get_self_healing_format_hint('find_element_by_css'),
+            'Return a CSS selector string.',
+        )
 
     def test_get_gemini_smart_extraction_returns_structured_json(self):
         with unittest.mock.patch('login.lib.llm_handler.get_gemini_response', return_value='{"title": "Crawla"}'):

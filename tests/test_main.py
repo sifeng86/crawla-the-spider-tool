@@ -33,6 +33,14 @@ class MainModuleTests(unittest.TestCase):
         self.assertFalse(self.main.should_use_preview_cache('py_selenium'))
         self.assertFalse(self.main.should_use_preview_cache('py_playwright'))
 
+    def test_get_requests_accept_encoding_defaults_without_brotli(self):
+        with patch.object(self.main, 'supports_brotli', return_value=False):
+            self.assertEqual(self.main.get_requests_accept_encoding(), 'gzip, deflate')
+
+    def test_get_requests_accept_encoding_includes_brotli_when_supported(self):
+        with patch.object(self.main, 'supports_brotli', return_value=True):
+            self.assertEqual(self.main.get_requests_accept_encoding(), 'gzip, deflate, br')
+
     def test_cache_preview_content_prefers_requests_for_llm(self):
         response = types.SimpleNamespace(text='<html>fast-preview</html>')
 
@@ -198,6 +206,49 @@ class MainModuleTests(unittest.TestCase):
         with patch.object(self.main.StepExecutor, 'execute_soup', side_effect=execute_soup_side_effect), \
              patch('login.lib.llm_handler.get_gemini_self_healing', return_value='h3'):
             result = self.main.execute_soup_steps(soup, [('select_one', '.broken-title'), ('ext_str_get_text', '-')])
+
+        self.assertEqual(result, ['Crawla Data Extractor'])
+
+    def test_execute_selenium_steps_attempts_llm_self_healing(self):
+        driver = MagicMock()
+        driver.page_source = '<html><h3>Crawla Data Extractor</h3></html>'
+        healed_node = object()
+
+        def execute_selenium_side_effect(current, step_name, param):
+            if step_name == 'find_element_by_css' and param == '.broken-title':
+                raise ValueError('not found')
+            if step_name == 'find_element_by_css' and param == 'h3':
+                return healed_node
+            if step_name == 'ext_str_get_text' and current is healed_node:
+                return 'Crawla Data Extractor'
+            return None
+
+        with patch.object(self.main.StepExecutor, 'execute_selenium', side_effect=execute_selenium_side_effect), \
+             patch('login.lib.llm_handler.get_gemini_self_healing', return_value='h3'):
+            result = self.main.execute_selenium_steps(driver, [('find_element_by_css', '.broken-title'), ('ext_str_get_text', '-')])
+
+        self.assertEqual(result, ['Crawla Data Extractor'])
+
+    def test_execute_playwright_steps_attempts_llm_self_healing(self):
+        page = MagicMock()
+        page.content.return_value = '<html><h3>Crawla Data Extractor</h3></html>'
+        broken_locator = MagicMock()
+        broken_locator.count.return_value = 0
+        healed_locator = MagicMock()
+        healed_locator.count.return_value = 1
+
+        def execute_playwright_side_effect(current, step_name, param):
+            if step_name == 'find_element_by_css' and param == '.broken-title':
+                return broken_locator
+            if step_name == 'find_element_by_css' and param == 'h3':
+                return healed_locator
+            if step_name == 'ext_str_get_text' and current is healed_locator:
+                return 'Crawla Data Extractor'
+            return None
+
+        with patch.object(self.main.StepExecutor, 'execute_playwright', side_effect=execute_playwright_side_effect), \
+             patch('login.lib.llm_handler.get_gemini_self_healing', return_value='h3'):
+            result = self.main.execute_playwright_steps(page, [('find_element_by_css', '.broken-title'), ('ext_str_get_text', '-')])
 
         self.assertEqual(result, ['Crawla Data Extractor'])
 

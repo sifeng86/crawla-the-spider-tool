@@ -4,14 +4,14 @@
 
 Crawla is an advanced, AI-powered web spider tool designed to simplify data extraction. Built with a stunning modern Glassmorphism interface, it allows developers and data engineers to configure crawlers visually without dealing with complex code.
 
-With the latest 2.0 update, Crawla introduces **LLM Self-Healing** (auto-fixing broken selectors) and **Smart Data Extraction** (JSON Schema parsing) directly powered by Google Gemini AI, along with parallel processing for ultra-fast scraping.
+With the latest 2.0 update, Crawla introduces **LLM Self-Healing for step-based crawlers** (auto-fixing broken selectors or locator parameters in Requests/BS4, Selenium, and Playwright) and **Smart Data Extraction** (JSON Schema parsing) directly powered by Google Gemini AI, along with parallel processing for ultra-fast scraping.
 
 Demo: https://crawla.cachigo.com
 
 ## ✨ Key Features
 * **Set & Go Architecture**: Fully containerized with MongoDB, Redis, and Selenium Chrome included. Local Docker mode starts with built-in defaults.
 * **Premium UX/UI**: Beautiful Glassmorphism design, full Dark Mode support, and interactive Skeleton Loaders.
-* **LLM Self-Healing**: Automatically repairs broken CSS selectors using Gemini AI when websites update their layout.
+* **LLM Self-Healing (Requests/Selenium/Playwright)**: Automatically repairs broken selectors or locator parameters using Gemini AI in the step-based flows when websites update their layout.
 * **Smart Data Extraction**: Pass a JSON Schema and let LLM parse unstructured pages into perfect JSON automatically.
 * **High-Speed Concurrency**: Uses `ThreadPoolExecutor` to crawl multiple URLs simultaneously.
 * **4 Extraction Engines**: Choose between ⚡ Requests (BS4), 🌐 Selenium, 🎭 Playwright, or 🧠 LLM AI extraction.
@@ -125,15 +125,15 @@ LLM tasks can be saved and scheduled just like other methods.
 
 ---
 
-## 🔧 LLM Self-Healing
+## 🔧 LLM Self-Healing (Requests, Selenium, Playwright)
 
-When a BS4 navigation step (e.g., `select_one("#price > span")`) fails to find an element, Crawla automatically:
+When a step-based navigation lookup (for example `select_one("#price > span")` in BS4 or `find_element_by_css("#price > span")` in Selenium/Playwright) fails to find an element, Crawla automatically:
 1. Extracts the surrounding HTML snippet from the page.
-2. Sends it to Gemini with the failing selector.
-3. Gemini suggests a new working selector.
-4. Crawla retries the step with the healed selector.
+2. Sends it to Gemini with the failing step name and parameter.
+3. Gemini suggests a new working parameter in the same format required by that step.
+4. Crawla retries the step with the healed parameter.
 
-This is automatic for the BeautifulSoup flow. Browser-driven self-healing is not enabled yet.
+This is automatic for the Requests/BS4, Selenium, and Playwright step-based flows. The `py_llm` method does not use selectors, so it does not participate in selector self-healing.
 
 ---
 

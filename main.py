@@ -6,7 +6,8 @@ import requests
 import json
 import sys
 import datetime
-from typing import List, Dict, Any, Optional, Tuple
+import importlib.util
+from typing import List, Dict, Any, Optional, Tuple, Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from selenium import webdriver
@@ -23,6 +24,7 @@ from login.lib.rate_limiter import rate_limiter
 db = mongoHelper.mongo_conn()
 
 PREVIEW_CACHE_METHODS = {'py_requests', 'py_llm'}
+MAX_SELF_HEAL_HTML_CHARS = 5000
 
 
 def utc_now() -> datetime.datetime:
@@ -86,6 +88,169 @@ def format_preview_results(results: List[Any]) -> str:
         return str(results)
 
 
+def supports_brotli() -> bool:
+    return importlib.util.find_spec('brotli') is not None or importlib.util.find_spec('brotlicffi') is not None
+
+
+def get_requests_accept_encoding() -> str:
+    encodings = ['gzip', 'deflate']
+    if supports_brotli():
+        encodings.append('br')
+    return ', '.join(encodings)
+
+
+def normalize_step_name(step_name: str) -> str:
+    return StepExecutor.LEGACY_STEP_ALIASES.get(step_name, step_name)
+
+
+def is_self_healable_step(step_name: str) -> bool:
+    normalized_name = normalize_step_name(step_name)
+    return normalized_name in {'select_one', 'select_all'} or normalized_name.startswith('find_element_by') or normalized_name.startswith('find_elements_by')
+
+
+def truncate_html_snippet(html: Optional[str]) -> str:
+    return (html or '')[:MAX_SELF_HEAL_HTML_CHARS]
+
+
+def iter_context_candidates(*candidates: Any):
+    for candidate in candidates:
+        if candidate is None:
+            continue
+
+        if isinstance(candidate, list):
+            for item in candidate[:3]:
+                if item is not None:
+                    yield item
+            continue
+
+        yield candidate
+
+
+def build_soup_html_snippet(current: Any) -> str:
+    return truncate_html_snippet(str(current))
+
+
+def build_selenium_html_snippet(current: Any, driver: webdriver.Remote) -> str:
+    for candidate in iter_context_candidates(current, driver):
+        get_attribute = getattr(candidate, 'get_attribute', None)
+        if callable(get_attribute):
+            try:
+                html = get_attribute('outerHTML') or get_attribute('innerHTML')
+                if html:
+                    return truncate_html_snippet(html)
+            except Exception:
+                pass
+
+        page_source = getattr(candidate, 'page_source', None)
+        if isinstance(page_source, str) and page_source:
+            return truncate_html_snippet(page_source)
+
+    return ''
+
+
+def build_playwright_html_snippet(current: Any, page: Any) -> str:
+    for candidate in iter_context_candidates(current, page):
+        content = getattr(candidate, 'content', None)
+        if callable(content):
+            try:
+                html = content()
+                if isinstance(html, str) and html:
+                    return truncate_html_snippet(html)
+            except Exception:
+                pass
+
+        evaluate = getattr(candidate, 'evaluate', None)
+        if callable(evaluate):
+            try:
+                html = evaluate('node => node.outerHTML')
+                if isinstance(html, str) and html:
+                    return truncate_html_snippet(html)
+            except Exception:
+                pass
+
+    return ''
+
+
+def basic_result_needs_healing(result: Any) -> bool:
+    return result is None or (isinstance(result, list) and len(result) == 0)
+
+
+def playwright_result_needs_healing(result: Any) -> bool:
+    if basic_result_needs_healing(result):
+        return True
+
+    count = getattr(result, 'count', None)
+    if callable(count):
+        try:
+            return count() == 0
+        except Exception:
+            return False
+
+    return False
+
+
+def attempt_llm_self_healing(
+    current: Any,
+    step_name: str,
+    param: str,
+    execute_step: Callable[[Any, str, str], Any],
+    get_html_snippet: Callable[[Any], str],
+    failure_message: str,
+) -> Any:
+    print(f"{failure_message} Attempting LLM Self-Healing...")
+
+    try:
+        from login.lib.llm_handler import get_gemini_self_healing
+
+        healed_param = get_gemini_self_healing(step_name, param, get_html_snippet(current))
+        if healed_param and healed_param != param:
+            print(f"Healed parameter: {healed_param}")
+            return execute_step(current, step_name, healed_param)
+    except Exception as healing_error:
+        print(f"Self-healing failed: {healing_error}")
+
+    return None
+
+
+def execute_step_with_self_healing(
+    current: Any,
+    step_name: str,
+    param: str,
+    execute_step: Callable[[Any, str, str], Any],
+    get_html_snippet: Callable[[Any], str],
+    result_needs_healing: Callable[[Any], bool],
+    failure_label: str,
+) -> Any:
+    try:
+        result = execute_step(current, step_name, param)
+    except Exception as original_error:
+        healed_result = attempt_llm_self_healing(
+            current,
+            step_name,
+            param,
+            execute_step,
+            get_html_snippet,
+            f"{failure_label} '{step_name}' with '{param}' failed: {original_error}.",
+        )
+        if healed_result is not None:
+            return healed_result
+        raise
+
+    if result_needs_healing(result):
+        healed_result = attempt_llm_self_healing(
+            current,
+            step_name,
+            param,
+            execute_step,
+            get_html_snippet,
+            f"{failure_label} '{step_name}' with '{param}' yielded empty.",
+        )
+        if healed_result is not None:
+            return healed_result
+
+    return result
+
+
 def get_page_requests(url: str, use_rate_limit: bool = True) -> Optional[requests.Response]:
     """
     Fetch page using requests library with stealth headers.
@@ -102,7 +267,7 @@ def get_page_requests(url: str, use_rate_limit: bool = True) -> Optional[request
     
     headers = {
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-        "Accept-Encoding": "gzip, deflate, br",
+        "Accept-Encoding": get_requests_accept_encoding(),
         "Accept-Language": "en-US,en;q=0.9",
         "Cache-Control": "max-age=0",
         "Sec-Ch-Ua": '"Not_A Brand";v="8", "Chromium";v="131"',
@@ -218,19 +383,18 @@ def execute_soup_steps(soup: BeautifulSoup, steps: List[Tuple[str, str]]) -> Lis
                 temp = original
             else:
                 # Navigation step - update temp
-                new_temp = StepExecutor.execute_soup(temp, step_name, param)
-                
-                if not new_temp or (isinstance(new_temp, list) and len(new_temp) == 0):
-                    print(f"Step '{step_name}' with '{param}' yielded empty. Attempting LLM Self-Healing...")
-                    try:
-                        from login.lib.llm_handler import get_gemini_self_healing
-                        snippet = str(temp)[:5000]
-                        healed_param = get_gemini_self_healing(step_name, param, snippet)
-                        if healed_param and healed_param != param:
-                            print(f"Healed parameter: {healed_param}")
-                            new_temp = StepExecutor.execute_soup(temp, step_name, healed_param)
-                    except Exception as he:
-                        print(f"Self-healing failed: {he}")
+                if is_self_healable_step(step_name):
+                    new_temp = execute_step_with_self_healing(
+                        temp,
+                        step_name,
+                        param,
+                        StepExecutor.execute_soup,
+                        build_soup_html_snippet,
+                        basic_result_needs_healing,
+                        'Step',
+                    )
+                else:
+                    new_temp = StepExecutor.execute_soup(temp, step_name, param)
                 
                 temp = new_temp
                 
@@ -274,7 +438,18 @@ def execute_selenium_steps(driver: webdriver.Remote, steps: List[Tuple[str, str]
                 current = driver
             else:
                 # Navigation/action step
-                result = StepExecutor.execute_selenium(current, step_name, param)
+                if is_self_healable_step(step_name):
+                    result = execute_step_with_self_healing(
+                        current,
+                        step_name,
+                        param,
+                        StepExecutor.execute_selenium,
+                        lambda context: build_selenium_html_snippet(context, driver),
+                        basic_result_needs_healing,
+                        'Selenium step',
+                    )
+                else:
+                    result = StepExecutor.execute_selenium(current, step_name, param)
                 if result is not None:
                     current = result
                     
@@ -318,7 +493,18 @@ def execute_playwright_steps(page, steps: List[Tuple[str, str]]) -> List[Any]:
                 current = page
             else:
                 # Navigation/action step
-                result = StepExecutor.execute_playwright(current, step_name, param)
+                if is_self_healable_step(step_name):
+                    result = execute_step_with_self_healing(
+                        current,
+                        step_name,
+                        param,
+                        StepExecutor.execute_playwright,
+                        lambda context: build_playwright_html_snippet(context, page),
+                        playwright_result_needs_healing,
+                        'Playwright step',
+                    )
+                else:
+                    result = StepExecutor.execute_playwright(current, step_name, param)
                 if result is not None:
                     current = result
                     
