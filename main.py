@@ -30,6 +30,7 @@ from login.lib.selector_memory import (
 db = mongoHelper.mongo_conn()
 
 PREVIEW_CACHE_METHODS = {'py_requests', 'py_llm'}
+LIVE_BROWSER_METHODS = {'py_selenium', 'py_playwright'}
 MAX_SELF_HEAL_HTML_CHARS = 5000
 
 
@@ -73,6 +74,23 @@ def get_preview_source(url: str, method: str) -> Optional[str]:
         return None
 
     return response.text
+
+
+def get_inspector_source(url: str, method: str) -> Optional[str]:
+    if method == 'py_selenium':
+        page_source, driver = get_page_selenium(url)
+        if not driver:
+            return None
+
+        try:
+            return page_source
+        finally:
+            driver.quit()
+
+    if method == 'py_playwright':
+        return get_page_playwright(url)
+
+    return get_preview_source(url, method)
 
 
 def should_use_preview_cache(method: str) -> bool:
@@ -913,6 +931,25 @@ def parse_arguments() -> Tuple[str, Optional[str], List[Dict]]:
         if not cache_preview_content(arg_pid, arg_url, arg_method, user_id=arg_user_id):
             sys.exit('Failed to cache preview content')
 
+        sys.exit(0)
+
+    elif sys.argv[1] == '--snapshothtml':
+        if len(sys.argv) < 3:
+            sys.exit('Snapshot parameter is missing')
+        payload = parse_preview_payload(sys.argv[2])
+        if not payload:
+            sys.exit('Snapshot parameter format is invalid')
+
+        arg_url = normalize_optional_text(payload.get('url')) or ''
+        arg_method = normalize_optional_text(payload.get('c_method')) or 'py_requests'
+        if not arg_url:
+            sys.exit('Snapshot parameter format is invalid')
+
+        snapshot_html = get_inspector_source(arg_url, arg_method)
+        if not snapshot_html:
+            sys.exit('Failed to build inspector snapshot')
+
+        sys.stdout.write(snapshot_html)
         sys.exit(0)
         
     elif sys.argv[1] == '--preview':

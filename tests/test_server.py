@@ -245,8 +245,17 @@ class ServerModuleTests(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
             body = response.get_data(as_text=True)
             self.assertIn('Crawla AI Studio', body)
-            self.assertIn('Studio workspace is live', body)
-            self.assertIn('Flow blueprint', body)
+            self.assertIn('Choose method', body)
+            self.assertIn('Setup', body)
+            self.assertIn('Build flow', body)
+            self.assertIn('Optional tools', body)
+            self.assertIn('studio-tip', body)
+            self.assertIn('Warm Cache', body)
+            self.assertIn('Load Snapshot', body)
+            self.assertIn('Preview', body)
+            self.assertIn('Replace Flow', body)
+            self.assertIn('Save', body)
+            self.assertIn('studio-preview-meta-row', body)
 
     def test_studio_route_respects_feature_flag(self):
         env_vars = {
@@ -432,32 +441,77 @@ class ServerModuleTests(unittest.TestCase):
                 session[module.constants.PROFILE_KEY] = module.get_local_profile()
                 session['studio_token'] = 'studio-preview-1'
 
+            with patch.object(
+                module,
+                'fetch_live_snapshot_html',
+                return_value='<html><body><script>alert(1)</script><h1 id="headline" onclick="evil()">Docs</h1></body></html>',
+            ) as fetch_live_snapshot_html:
+                response = client.post(
+                    '/studio/api/inspector',
+                    json={
+                        'preview_id': 'studio-preview-1',
+                        'url': 'https://docs.github.com/en',
+                        'c_method': 'py_playwright',
+                    },
+                )
+
+            self.assertEqual(response.status_code, 200)
+            payload = response.get_json()
+            self.assertEqual(payload['source_mode'], 'browser_snapshot')
+            self.assertIn('Browser-rendered DOM snapshot', payload['note'])
+            self.assertIn('crawla-studio-inspector', payload['html'])
+            self.assertNotIn('alert(1)', payload['html'])
+            self.assertNotIn('onclick=', payload['html'])
+            fetch_live_snapshot_html.assert_called_once_with(
+                module.build_preview_cache_payload(
+                    'studio-preview-1',
+                    'https://docs.github.com/en',
+                    'py_playwright',
+                    'local_admin',
+                )
+            )
+            fake_db.preview_contents.find.assert_not_called()
+
+    def test_studio_inspector_uses_cached_preview_for_requests(self):
+        env_vars = {
+            'APP_ENV': 'local',
+            'SECRET_KEY': 'test-secret',
+            'CRAWLA_STUDIO_ENABLED': 'true',
+        }
+        with patch.dict(os.environ, env_vars, clear=False):
+            module, fake_db = load_server_module(env_vars)
+            client = module.app.test_client()
+
+            with client.session_transaction() as session:
+                session[module.constants.PROFILE_KEY] = module.get_local_profile()
+                session['studio_token'] = 'studio-preview-2'
+
             cursor = MagicMock()
             cursor.limit.return_value = [
                 {
-                    'contents': '<html><body><script>alert(1)</script><h1 id="headline" onclick="evil()">Docs</h1></body></html>'
+                    'contents': '<html><body><h1>Docs</h1></body></html>'
                 }
             ]
             fake_db.preview_contents.find.return_value = cursor
 
-            response = client.post(
-                '/studio/api/inspector',
-                json={
-                    'preview_id': 'studio-preview-1',
-                    'url': 'https://docs.github.com/en',
-                    'c_method': 'py_playwright',
-                },
-            )
+            with patch.object(module, 'fetch_live_snapshot_html') as fetch_live_snapshot_html:
+                response = client.post(
+                    '/studio/api/inspector',
+                    json={
+                        'preview_id': 'studio-preview-2',
+                        'url': 'https://docs.github.com/en',
+                        'c_method': 'py_requests',
+                    },
+                )
 
             self.assertEqual(response.status_code, 200)
             payload = response.get_json()
-            self.assertEqual(payload['source_mode'], 'http_snapshot')
-            self.assertIn('crawla-studio-inspector', payload['html'])
-            self.assertNotIn('alert(1)', payload['html'])
-            self.assertNotIn('onclick=', payload['html'])
+            self.assertEqual(payload['source_mode'], 'cached_html')
+            self.assertIn('Cached HTML preview', payload['note'])
             fake_db.preview_contents.find.assert_called_once_with(
-                {'preview_id': 'studio-preview-1', 'user_id': 'local_admin'}
+                {'preview_id': 'studio-preview-2', 'user_id': 'local_admin'}
             )
+            fetch_live_snapshot_html.assert_not_called()
 
     def test_production_requires_secret_key(self):
         env_vars = {

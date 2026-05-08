@@ -8,6 +8,13 @@ The product focus is practical: help users find the right selector faster, keep 
 
 Demo: https://crawla.cachigo.com
 
+## Documentation
+
+If you are starting from scratch, read these guides in this order:
+
+* [docs/OPERATING_GUIDE.md](docs/OPERATING_GUIDE.md) - end-to-end local setup, screen-by-screen usage, extraction methods, preview flow, Studio flow, scheduling, and troubleshooting.
+* [docs/AUTH0_SETUP.md](docs/AUTH0_SETUP.md) - step-by-step Auth0 setup for staging or production.
+
 ## What Crawla Is Good At
 
 Crawla is strongest when you need to build and keep running a crawler for a page that changes over time.
@@ -26,7 +33,7 @@ Typical examples:
 * Four extraction methods: Requests/BS4, Selenium, Playwright, and LLM extraction.
 * Step-based execution for Requests, Selenium, and Playwright.
 * Studio workspace route with method catalog, draft schema, and task save/queue flow.
-* Visual Inspector API for preview-backed element picking and selector candidate generation.
+* Visual Inspector API for cached-preview or live-browser element picking and selector candidate generation.
 * AI Copilot API for draft flow planning, including selector-memory grounding.
 * Selector Memory for domain-scoped selector reuse across successful runs.
 * Runtime selector repair pipeline for Requests, Selenium, and Playwright.
@@ -49,7 +56,7 @@ Typical examples:
 * **4 Extraction Engines**: Use the cheapest runtime that fits the job, then escalate only when needed.
 * **Selector Memory**: Successful selectors are stored by domain, method, and step for future reuse.
 * **Runtime Self-Healing**: Requests, Selenium, and Playwright flows try memory, heuristics, and finally LLM repair when a locator fails.
-* **Visual Inspector**: Generate CSS, XPath, and attribute candidates from a preview surface instead of guessing selectors manually.
+* **Visual Inspector**: Generate CSS, XPath, and attribute candidates from either cached HTML or a browser-rendered DOM snapshot instead of guessing selectors manually.
 * **AI Copilot**: Draft starter flows from a goal, URL, and runtime, grounded by method templates and selector memory.
 * **Smart Data Extraction**: Use a prompt or strict JSON Schema with `py_llm` for semi-structured pages.
 * **Concurrency & Scheduling**: Run tasks in parallel and schedule recurring crawls through CLI or queue workflows.
@@ -74,6 +81,7 @@ Recommended Gemini settings for cost control:
 ### Prerequisites
 * Docker with Compose support
 * Google Gemini API Key only if you want LLM-based features
+* WSL or another Unix-like shell if you want to use the `cp` examples as written on Windows
 
 ### Local Mode
 
@@ -89,13 +97,27 @@ That is enough for local mode.
 * MongoDB, Redis, Selenium Chrome, and Celery are managed by Docker
 
 **Step 2 - Optional app settings**
+
+WSL / macOS / Linux:
 ```bash
 cp login/.env_example login/.env
 ```
 
+PowerShell:
+```powershell
+Copy-Item login/.env_example login/.env
+```
+
 **Step 3 - Optional LLM settings**
+
+WSL / macOS / Linux:
 ```bash
 cp login/setting/config_example.json login/setting/config.json
+```
+
+PowerShell:
+```powershell
+Copy-Item login/setting/config_example.json login/setting/config.json
 ```
 
 Then add your Gemini API key under `llm.gemini.api_key`.
@@ -125,6 +147,29 @@ The intended workflow is straightforward:
 6. Let selector memory and runtime healing reduce maintenance when the site drifts.
 
 For recurring pages such as lottery results, notices, or price blocks, this is the main value of Crawla today.
+
+## Web UI Map
+
+* `/login` - local mode creates a `Local Admin` session automatically; production and staging redirect to Auth0.
+* `/contents` - classic builder for step-based task creation, previews, saved-task controls, schedule toggling, and CSV download.
+* `/studio` - visual workspace with method cards, draft payload, inspector, copilot, flow editor, and selector-memory panels.
+* `/dashboard` - signed-in profile summary.
+
+For a full walkthrough of each screen, see [docs/OPERATING_GUIDE.md](docs/OPERATING_GUIDE.md).
+
+## Authentication Modes
+
+### Local Mode
+
+`docker compose up -d --build` defaults to `APP_ENV=local`, so clicking `Get Started` signs you in as `Local Admin`. This is the intended development mode.
+
+### Staging / Production Mode
+
+Set `APP_ENV=production` and provide the Auth0 settings in `login/.env`. Crawla will then redirect `/login` to Auth0, create a session from the returned user profile, and scope saved tasks by that user id.
+
+Each authenticated user sees only their own tasks, previews, and Studio saves.
+
+See [docs/AUTH0_SETUP.md](docs/AUTH0_SETUP.md) for the complete setup flow.
 
 ## Extraction Methods
 
@@ -157,7 +202,8 @@ Studio is the product direction for building crawlers faster while keeping the f
 ### Available Now
 * `/studio` workspace shell and draft schema.
 * Method catalog with starter nodes for each runtime.
-* `/studio/api/inspector` for preview-backed selector picking.
+* `/studio/api/inspector` for selector picking from cached HTML or live browser DOM snapshots.
+* Inspector uses cached HTML for `py_requests` and `py_llm`, and browser-rendered DOM snapshots for `py_selenium` and `py_playwright`.
 * `/studio/api/copilot` for goal-to-flow draft generation.
 * `/studio/api/selector-memory` for domain-level selector memory summaries.
 * Studio task save and queue dispatch flow.
@@ -222,6 +268,10 @@ AUTH0_CALLBACK_URL=https://your-domain.com/callback
 AUTH0_LOGOUT_REDIRECT_URL=https://your-domain.com/
 ```
 
+Use a Regular Web Application in Auth0. The callback URL must exactly match `AUTH0_CALLBACK_URL`, and the logout URL must exactly match `AUTH0_LOGOUT_REDIRECT_URL`.
+
+For the full checklist, including verification steps, see [docs/AUTH0_SETUP.md](docs/AUTH0_SETUP.md).
+
 ### MongoDB Atlas
 
 To use Atlas instead of the bundled MongoDB, update `login/setting/config.json`:
@@ -256,7 +306,7 @@ login/lib/
   llm_handler.py     -> Gemini integration, caching, self-healing, schema extraction
   selector_memory.py -> Domain-scoped selector reuse and fallback ranking
   studio.py          -> Studio schema, method catalog, feature flags
-  studio_inspector.py-> Preview-backed element picker and selector candidates
+  studio_inspector.py-> Cached-preview and browser-snapshot element picker
   studio_copilot.py  -> Goal-to-flow planning with selector-memory grounding
   stealth.py         -> Anti-detection helpers
   rate_limiter.py    -> Per-domain rate limiting
@@ -271,6 +321,30 @@ login/lib/
 | `crawla_mongo` | mongo:6.0 | 27017 (internal) |
 | `crawla_redis` | redis:7.4-alpine | 6379 (internal) |
 | `crawla_chrome` | selenium/standalone-chrome:131 | 4444 (internal) |
+
+## Troubleshooting
+
+### Local mode only shows `Local Admin`
+
+That is expected when `APP_ENV=local`. To test real Auth0 login, switch to `APP_ENV=production` with valid `AUTH0_*` values. See [docs/AUTH0_SETUP.md](docs/AUTH0_SETUP.md).
+
+### Buttons or method switches do nothing
+
+Rebuild or restart the web container after pulling frontend changes:
+
+```bash
+docker compose up -d --build
+```
+
+If the app was already running before a template or JS change, use:
+
+```bash
+docker compose restart crawla_web
+```
+
+### Browser preview cannot reach a local target
+
+When Selenium or Playwright runs inside Docker, `127.0.0.1` points at the browser container, not your host machine. Use a container-reachable target such as `http://crawla_web:3000/` when you are testing against the local stack.
 
 ## License
 

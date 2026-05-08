@@ -5,14 +5,20 @@
     <title>Crawla Studio - Flow Workspace</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/css/bootstrap.min.css"
       integrity="sha384-B0vP5xmATw1+K9KRQjQERJvTumQW0nPEzvF6L/Z6nronJ3oUOFUFpCjEUQouq2+l" crossorigin="anonymous">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.15.3/css/fontawesome.min.css"
-      integrity="sha384-wESLQ85D6gbsF459vf1CiZ2+rr+CsxRY0RpiT1LlQpDnAgg6rwdsUF1+Ics2bni" crossorigin="anonymous">
     <link href="/public/app.css" rel="stylesheet">
   </head>
   <body class="studio-body">
     <header class="studio-topbar">
       <div class="studio-brand-block">
-        <img src="{{ url_for('static', filename='img/header-logo.png') }}" alt="Crawla logo">
+        <div class="crawla-mark crawla-mark-sm" role="img" aria-label="Crawla brand mark">
+          <span class="crawla-mark-core"></span>
+          <span class="crawla-mark-node crawla-mark-node-a"></span>
+          <span class="crawla-mark-node crawla-mark-node-b"></span>
+          <span class="crawla-mark-node crawla-mark-node-c"></span>
+          <span class="crawla-mark-link crawla-mark-link-a"></span>
+          <span class="crawla-mark-link crawla-mark-link-b"></span>
+          <span class="crawla-mark-link crawla-mark-link-c"></span>
+        </div>
         <div>
           <p class="studio-eyebrow">Crawla AI Studio</p>
           <h1 id="studio-title-heading">{{ studio_state.workspace.title }}</h1>
@@ -26,78 +32,200 @@
     </header>
 
     <main class="studio-shell">
-      <section class="glass-panel studio-hero-panel">
-        <div>
-          <p class="studio-eyebrow">Release 0 / 1 foundation</p>
-          <h2>Studio workspace is live</h2>
-          <p class="studio-hero-copy">This shell now edits the draft payload, primes preview cache, runs preview, and saves tasks into the existing queue without replacing the classic builder.</p>
-        </div>
-        <div class="studio-status-cluster">
-          <div class="studio-status-pill">Schema {{ studio_state.schema_version }}</div>
-          <div class="studio-status-pill accent">Draft {{ studio_state.draft_id }}</div>
-          <div class="studio-status-pill accent-soft">Goal: {{ studio_state.workspace.stability_goal }}</div>
-        </div>
-      </section>
+      <div class="studio-feedback studio-feedback-hidden" id="studio-feedback"></div>
 
-      <div class="studio-grid">
-        <section class="glass-panel studio-panel studio-method-panel">
-          <div class="studio-panel-head">
-            <div>
-              <p class="studio-panel-kicker">Method matrix</p>
-              <h3>Pick the runtime stance</h3>
-            </div>
-            <span class="studio-chip">{{ studio_catalog|length }} engines</span>
-          </div>
-          <div class="studio-method-list">
-            {% for method_key, method in studio_catalog.items() %}
-            <button type="button" class="studio-method-card{% if method_key == studio_state.selected_method %} is-active{% endif %}" data-method="{{ method_key }}">
-              <div class="studio-method-card-top">
-                <strong>{{ method.label }}</strong>
-                <span>{{ method.badge }}</span>
+      <div class="studio-workflow-stack">
+        <section class="glass-panel studio-step-shell studio-step-method" id="studio-step-method-panel">
+          <div class="studio-step-head">
+            <div class="studio-step-number">1</div>
+            <div class="studio-step-copy">
+              <p class="studio-panel-kicker">Step 1</p>
+              <div class="studio-heading-row">
+                <h2>Choose method</h2>
+                <span class="studio-tip" tabindex="0" aria-label="Method help" data-tip="Choose how Crawla opens the page. Requests is fastest. Browser methods handle interaction.">i</span>
               </div>
-              <p>{{ method.summary }}</p>
-              <small>{{ method.engine_label }}</small>
-            </button>
-            {% endfor %}
+            </div>
+            <span class="studio-chip">{{ studio_catalog|length }} methods</span>
           </div>
-          <div class="studio-method-detail" id="studio-method-detail"></div>
+          <div class="studio-method-chooser">
+            <div class="studio-method-list studio-method-list-compact">
+              {% for method_key, method in studio_catalog.items() %}
+              <button type="button" class="studio-method-card studio-method-card-compact{% if method_key == studio_state.selected_method %} is-active{% endif %}" data-method="{{ method_key }}" title="{{ method.summary }}">
+                <div class="studio-method-card-top">
+                  <strong>{{ method.label }}</strong>
+                  <span>{{ method.badge }}</span>
+                </div>
+              </button>
+              {% endfor %}
+            </div>
+            <div class="studio-method-detail studio-method-detail-compact" id="studio-method-detail"></div>
+          </div>
         </section>
 
-        <section class="glass-panel studio-panel studio-preview-panel">
-          <div class="studio-panel-head">
-            <div>
-              <p class="studio-panel-kicker">Workspace controls</p>
-              <h3 id="studio-preview-headline">{{ studio_state.preview.headline }}</h3>
+        <section class="glass-panel studio-step-shell studio-step-setup" id="studio-step-setup-panel">
+          <div class="studio-step-head">
+            <div class="studio-step-number">2</div>
+            <div class="studio-step-copy">
+              <p class="studio-panel-kicker">Step 2</p>
+              <div class="studio-heading-row">
+                <h2>Setup</h2>
+                <span class="studio-tip" tabindex="0" aria-label="Setup help" data-tip="Only three inputs matter here: task name, target URL, and notification email.">i</span>
+              </div>
             </div>
-            <span class="studio-chip" id="studio-preview-mode">{{ studio_state.preview.preview_mode }}</span>
           </div>
 
           <form class="studio-form-grid" id="studio-workspace-form">
             <label class="studio-field">
               <span>Task name</span>
-              <input type="text" id="studio-task-name" class="form-control" value="{{ studio_state.workspace.title }}" placeholder="Example: Docs changelog watcher">
+              <input type="text" id="studio-task-name" class="form-control form-control-sm" value="{{ studio_state.workspace.title }}" placeholder="Example: Docs changelog watcher">
             </label>
             <label class="studio-field studio-field-span-2">
               <span>Target URL</span>
-              <input type="url" id="studio-target-url" class="form-control" value="{{ studio_state.workspace.target_url }}" placeholder="https://docs.github.com/en">
+              <input type="url" id="studio-target-url" class="form-control form-control-sm" value="{{ studio_state.workspace.target_url }}" placeholder="https://docs.github.com/en">
             </label>
             <label class="studio-field">
-              <span>Notification email</span>
-              <input type="email" id="studio-noti-email" class="form-control" value="{{ studio_state.workspace.notification_email }}" placeholder="alerts@example.com">
+              <span>Notification email <small>required to save</small></span>
+              <input type="email" id="studio-noti-email" class="form-control form-control-sm" value="{{ studio_state.workspace.notification_email }}" placeholder="alerts@example.com">
             </label>
-            <div class="studio-field studio-field-span-2">
-              <span>Operator brief</span>
-              <div class="studio-inline-copy">{{ studio_state.workspace.subtitle }}</div>
-            </div>
           </form>
+        </section>
 
-          <div class="studio-action-row">
-            <button type="button" class="btn btn-outline-info" id="studio-prime-preview">Prime Preview</button>
-            <button type="button" class="btn btn-info" id="studio-run-preview">Run Preview</button>
-            <button type="button" class="btn btn-primary" id="studio-save-task">Save Task</button>
+        <section class="glass-panel studio-step-shell studio-step-flow" id="studio-step-flow-panel">
+          <div class="studio-step-head">
+            <div class="studio-step-number">3</div>
+            <div class="studio-step-copy">
+              <p class="studio-panel-kicker">Step 3</p>
+              <div class="studio-heading-row">
+                <h2>Build flow</h2>
+                <span class="studio-tip" tabindex="0" aria-label="Flow help" data-tip="Preview uses this node list as-is. Select a node before using Snapshot.">i</span>
+              </div>
+            </div>
+            <div class="studio-step-actions">
+              <span class="studio-chip" id="studio-node-count">{{ studio_state.flow.nodes|length }} nodes</span>
+              <button type="button" class="btn btn-sm btn-outline-info" id="studio-add-node">Add Node</button>
+            </div>
           </div>
 
-          <div class="studio-feedback studio-feedback-hidden" id="studio-feedback"></div>
+          <div class="studio-flow-list studio-flow-editor" id="studio-flow-list"></div>
+
+          <div class="studio-helper-shell">
+            <div class="studio-panel-head studio-helper-shell-head">
+              <div>
+                <p class="studio-panel-kicker">Helpers</p>
+                <div class="studio-heading-row">
+                  <h3>Optional tools</h3>
+                  <span class="studio-tip" tabindex="0" aria-label="Helper help" data-tip="Copilot drafts a starting flow. Snapshot repairs one node with a real selector.">i</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="studio-helper-grid studio-helper-grid-stacked">
+              <section class="studio-tool-card studio-copilot-panel studio-copilot-shell studio-helper-panel studio-action-card" id="studio-copilot-panel">
+                <div class="studio-panel-head">
+                  <div>
+                    <p class="studio-panel-kicker">Helper tool</p>
+                    <div class="studio-heading-row">
+                      <h3>Copilot</h3>
+                      <span class="studio-tip" tabindex="0" aria-label="Copilot help" data-tip="Use Copilot when you want a starter flow. You can still edit every node after applying it.">i</span>
+                    </div>
+                  </div>
+                  <div class="studio-panel-toolbar">
+                    <span class="studio-workflow-state is-pending" id="studio-copilot-helper-state">Optional</span>
+                    <span class="studio-chip" id="studio-copilot-source">template</span>
+                    <button type="button" class="btn btn-sm btn-outline-info" id="studio-toggle-copilot-panel" aria-expanded="false">Open panel</button>
+                    <button type="button" class="btn btn-sm btn-outline-info" id="studio-run-copilot">Generate Draft</button>
+                    <button type="button" class="btn btn-sm btn-warning" id="studio-apply-copilot" disabled>Replace Flow</button>
+                  </div>
+                </div>
+                <div class="studio-helper-collapsed-note" id="studio-copilot-collapsed-note" hidden>Open the panel when you want Copilot to draft or replace the current flow.</div>
+                <div class="studio-helper-panel-body" id="studio-copilot-panel-body">
+                  <label class="studio-field">
+                    <span>Goal for Copilot</span>
+                    <textarea id="studio-copilot-goal" class="form-control studio-copilot-input" rows="3" placeholder="Example: Collect article titles and links from the docs content area, then prepare a clean flow I can refine in the inspector.">{{ studio_state.copilot.goal }}</textarea>
+                  </label>
+                  <div class="studio-copilot-note" id="studio-copilot-note">{{ studio_state.copilot.note }}</div>
+                  <div class="studio-copilot-list" id="studio-copilot-list"></div>
+                </div>
+              </section>
+
+              <section class="studio-tool-card studio-inspector-panel studio-inspector-shell studio-helper-panel studio-action-card" id="studio-inspector-panel">
+                <div class="studio-panel-head">
+                  <div>
+                    <p class="studio-panel-kicker">Helper tool</p>
+                    <div class="studio-heading-row">
+                      <h3>Snapshot</h3>
+                      <span class="studio-tip" tabindex="0" aria-label="Snapshot help" data-tip="Use Snapshot when one node needs a better selector. Load the page, click, then apply a candidate.">i</span>
+                    </div>
+                  </div>
+                  <div class="studio-panel-toolbar">
+                    <span class="studio-workflow-state is-pending" id="studio-inspector-helper-state">Optional</span>
+                    <span class="studio-chip" id="studio-active-node-chip">Node 1</span>
+                    <button type="button" class="btn btn-sm btn-outline-info" id="studio-toggle-inspector-panel" aria-expanded="false">Open panel</button>
+                    <button type="button" class="btn btn-sm btn-outline-info" id="studio-load-inspector">Load Snapshot</button>
+                  </div>
+                </div>
+                <div class="studio-helper-collapsed-note" id="studio-inspector-collapsed-note" hidden>Open the panel when you need to inspect the page and apply a selector to the active node.</div>
+                <div class="studio-helper-panel-body" id="studio-inspector-panel-body">
+                  <div class="studio-inspector-layout">
+                    <div class="studio-inspector-frame-wrap" id="studio-inspector-frame-wrap">
+                      <iframe id="studio-inspector-frame" class="studio-inspector-frame" sandbox="allow-scripts"></iframe>
+                    </div>
+                    <div class="studio-inspector-sidebar">
+                      <div class="studio-inspector-summary" id="studio-inspector-summary">
+                        Click &quot;Load Snapshot&quot; to fetch the current page, then click any element to generate CSS or XPath candidates.
+                      </div>
+                      <div class="studio-inspector-candidates" id="studio-inspector-candidates"></div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
+        </section>
+
+        <section class="glass-panel studio-step-shell studio-step-preview" id="studio-step-preview-panel">
+          <div class="studio-step-head">
+            <div class="studio-step-number">4</div>
+            <div class="studio-step-copy">
+              <p class="studio-panel-kicker">Step 4</p>
+              <div class="studio-heading-row">
+                <h2 id="studio-preview-headline">Preview</h2>
+                <span class="studio-tip" tabindex="0" aria-label="Preview help" data-tip="Requests and LLM usually warm cache first. Browser methods can run preview directly.">i</span>
+              </div>
+              <p class="studio-section-guide" id="studio-preview-stage-note">Run preview after setup and flow are ready.</p>
+            </div>
+            <span class="studio-chip" id="studio-preview-mode">{{ studio_state.preview.preview_mode }}</span>
+          </div>
+
+          <div class="studio-preview-meta-row">
+            <div class="studio-preview-meta-pill">
+              <span>Method</span>
+              <strong id="studio-preview-method-name"></strong>
+            </div>
+            <div class="studio-preview-meta-pill studio-preview-meta-pill-wide">
+              <span>Target URL</span>
+              <strong id="studio-preview-target-summary">No target URL yet</strong>
+            </div>
+            <div class="studio-preview-meta-pill">
+              <span>Flow</span>
+              <strong id="studio-preview-node-summary">{{ studio_state.flow.nodes|length }} nodes</strong>
+            </div>
+          </div>
+
+          <section class="studio-tool-card studio-preview-run-card studio-action-card">
+            <div class="studio-panel-head">
+              <div>
+                <p class="studio-panel-kicker">Run</p>
+                <h3>Preview</h3>
+              </div>
+              <span class="studio-chip">Verify</span>
+            </div>
+            <div class="studio-action-row">
+              <button type="button" class="btn btn-outline-info" id="studio-prime-preview">Warm Cache</button>
+              <button type="button" class="btn btn-info" id="studio-run-preview">Run Preview</button>
+            </div>
+            <p class="studio-inline-guide studio-inline-guide-plain" id="studio-preview-guide">Use the current method, URL, and node list.</p>
+          </section>
 
           <div class="studio-preview-stage">
             <div class="studio-preview-orbit"></div>
@@ -105,12 +233,12 @@
               <div class="studio-preview-screen-header">
                 <div>
                   <p class="studio-preview-label" id="studio-preview-status">{{ studio_state.preview.status }}</p>
-                  <h4 id="studio-preview-title">URL and preview cache will appear here</h4>
+                  <h4 id="studio-preview-title">Preview output will appear here</h4>
                 </div>
                 <div class="studio-preview-target" id="studio-preview-target">No target URL yet</div>
               </div>
               <p id="studio-preview-detail">{{ studio_state.preview.detail }}</p>
-              <pre class="studio-preview-result" id="studio-preview-result">{{ studio_state.preview.last_result or 'No preview run yet. Prime cache for Requests / LLM, or run a live browser preview for Selenium / Playwright.' }}</pre>
+              <pre class="studio-preview-result" id="studio-preview-result">{{ studio_state.preview.last_result or 'No preview run yet. Build the steps first, then run preview here.' }}</pre>
               <div class="studio-preview-metrics">
                 <div>
                   <span>Preview ID</span>
@@ -121,124 +249,34 @@
                   <strong>{{ studio_state.workspace.operator }}</strong>
                 </div>
                 <div>
-                  <span>Method</span>
-                  <strong id="studio-preview-method-name"></strong>
+                  <span>Status</span>
+                  <strong id="studio-preview-status-copy">{{ studio_state.preview.status }}</strong>
                 </div>
               </div>
             </div>
           </div>
 
-          <div class="studio-feature-grid">
-            {% for panel in studio_state.feature_panels %}
-            <article class="studio-feature-card studio-feature-{{ panel.status }}">
-              <span>{{ panel.label }}</span>
-              <strong>{{ panel.status|upper }}</strong>
-              <p>{{ panel.description }}</p>
-            </article>
-            {% endfor %}
-          </div>
-
-          <section class="studio-copilot-shell">
-            <div class="studio-panel-head">
-              <div>
-                <p class="studio-panel-kicker">AI copilot</p>
-                <h3>Describe the data goal, get a draft flow</h3>
-              </div>
-              <div class="studio-panel-toolbar">
-                <span class="studio-chip" id="studio-copilot-source">template</span>
-                <button type="button" class="btn btn-sm btn-outline-info" id="studio-run-copilot">Generate Flow</button>
-                <button type="button" class="btn btn-sm btn-info" id="studio-apply-copilot" disabled>Apply Suggestion</button>
-              </div>
-            </div>
-            <label class="studio-field">
-              <span>Goal for Copilot</span>
-              <textarea id="studio-copilot-goal" class="form-control studio-copilot-input" rows="3" placeholder="Example: Collect article titles and links from the docs content area, then prepare a clean flow I can refine in the inspector.">{{ studio_state.copilot.goal }}</textarea>
-            </label>
-            <div class="studio-copilot-note" id="studio-copilot-note">{{ studio_state.copilot.note }}</div>
-            <div class="studio-copilot-list" id="studio-copilot-list"></div>
-          </section>
-
-          <section class="studio-inspector-shell">
-            <div class="studio-panel-head">
-              <div>
-                <p class="studio-panel-kicker">Visual inspector</p>
-                <h3>Pick DOM targets from a safe snapshot</h3>
-              </div>
-              <div class="studio-panel-toolbar">
-                <span class="studio-chip" id="studio-active-node-chip">Node 1</span>
-                <button type="button" class="btn btn-sm btn-outline-info" id="studio-load-inspector">Load Inspector</button>
-              </div>
-            </div>
-
-            <div class="studio-inspector-layout">
-              <div class="studio-inspector-frame-wrap">
-                <iframe id="studio-inspector-frame" class="studio-inspector-frame" sandbox="allow-scripts"></iframe>
-              </div>
-              <div class="studio-inspector-sidebar">
-                <div class="studio-inspector-summary" id="studio-inspector-summary">
-                  Inspector snapshot has not been loaded yet.
-                </div>
-                <div class="studio-inspector-candidates" id="studio-inspector-candidates"></div>
-              </div>
-            </div>
-          </section>
         </section>
 
-        <section class="glass-panel studio-panel studio-side-panel">
-          <div class="studio-panel-head">
-            <div>
-              <p class="studio-panel-kicker">Draft payload</p>
-              <h3>Live workspace schema</h3>
-            </div>
-            <span class="studio-chip">JSON-first</span>
-          </div>
-          <pre class="studio-json" id="studio-json-output">{{ studio_state | tojson(indent=2) }}</pre>
-        </section>
-      </div>
-
-      <div class="studio-lower-grid">
-        <section class="glass-panel studio-panel studio-flow-panel">
-          <div class="studio-panel-head">
-            <div>
-              <p class="studio-panel-kicker">Flow blueprint</p>
-              <h3>Editable nodes</h3>
-            </div>
-            <div class="studio-panel-toolbar">
-              <span class="studio-chip" id="studio-node-count">{{ studio_state.flow.nodes|length }} nodes</span>
-              <button type="button" class="btn btn-sm btn-outline-info" id="studio-add-node">Add Node</button>
-            </div>
-          </div>
-          <div class="studio-flow-list studio-flow-editor" id="studio-flow-list"></div>
-        </section>
-
-        <section class="glass-panel studio-panel studio-events-panel">
-          <div class="studio-panel-head">
-            <div>
-              <p class="studio-panel-kicker">Run event ledger</p>
-              <h3>Debugger foundation</h3>
-            </div>
-            <span class="studio-chip">{{ studio_state.run.event_schema|length }} event types</span>
-          </div>
-          <div class="studio-event-list" id="studio-event-list"></div>
-          <div class="studio-template-strip">
-            {% for template in studio_state.templates %}
-            <article class="studio-template-card">
-              <strong>{{ template.title }}</strong>
-              <p>{{ template.description }}</p>
-            </article>
-            {% endfor %}
-          </div>
-          <section class="studio-memory-shell">
-            <div class="studio-panel-head">
-              <div>
-                <p class="studio-panel-kicker">Selector memory</p>
-                <h3>Recent healing wins for this domain</h3>
+        <section class="glass-panel studio-step-shell studio-step-save" id="studio-step-save-panel">
+          <div class="studio-step-head">
+            <div class="studio-step-number">5</div>
+            <div class="studio-step-copy">
+              <p class="studio-panel-kicker">Step 5</p>
+              <div class="studio-heading-row">
+                <h2>Save</h2>
+                <span class="studio-tip" tabindex="0" aria-label="Save help" data-tip="Save only after preview matches the expected result.">i</span>
               </div>
-              <button type="button" class="btn btn-sm btn-outline-info" id="studio-refresh-memory">Refresh Memory</button>
             </div>
-            <div class="studio-memory-note" id="studio-memory-note">{{ studio_state.healing.memory_note }}</div>
-            <div class="studio-memory-list" id="studio-memory-list"></div>
-          </section>
+          </div>
+
+          <div class="studio-save-strip">
+            <section class="studio-save-actions-card studio-action-card">
+              <span class="studio-chip" id="studio-save-status-chip">Preview first</span>
+              <p class="studio-section-guide" id="studio-save-note">Preview first.</p>
+              <button type="button" class="btn btn-primary" id="studio-save-task">Save Task</button>
+            </section>
+          </div>
         </section>
       </div>
     </main>
@@ -264,9 +302,14 @@
       const previewStatus = document.getElementById('studio-preview-status');
       const previewTitle = document.getElementById('studio-preview-title');
       const previewTarget = document.getElementById('studio-preview-target');
+      const previewTargetSummary = document.getElementById('studio-preview-target-summary');
       const previewDetail = document.getElementById('studio-preview-detail');
+      const previewStageNote = document.getElementById('studio-preview-stage-note');
+      const previewGuide = document.getElementById('studio-preview-guide');
       const previewResult = document.getElementById('studio-preview-result');
       const previewMethodName = document.getElementById('studio-preview-method-name');
+      const previewNodeSummary = document.getElementById('studio-preview-node-summary');
+      const previewStatusCopy = document.getElementById('studio-preview-status-copy');
       const eventList = document.getElementById('studio-event-list');
       const feedback = document.getElementById('studio-feedback');
       const jsonOutput = document.getElementById('studio-json-output');
@@ -276,6 +319,7 @@
       const addNodeButton = document.getElementById('studio-add-node');
       const loadInspectorButton = document.getElementById('studio-load-inspector');
       const activeNodeChip = document.getElementById('studio-active-node-chip');
+      const inspectorFrameWrap = document.getElementById('studio-inspector-frame-wrap');
       const inspectorFrame = document.getElementById('studio-inspector-frame');
       const inspectorSummary = document.getElementById('studio-inspector-summary');
       const inspectorCandidates = document.getElementById('studio-inspector-candidates');
@@ -288,6 +332,30 @@
       const refreshMemoryButton = document.getElementById('studio-refresh-memory');
       const memoryNote = document.getElementById('studio-memory-note');
       const memoryList = document.getElementById('studio-memory-list');
+      const nodeMissionCard = document.getElementById('studio-node-mission-card');
+      const nextStepCard = document.getElementById('studio-next-step-card');
+      const workflowMap = document.getElementById('studio-workflow-map');
+      const workflowSummaryChip = document.getElementById('studio-workflow-summary-chip');
+      const previewChecklist = document.getElementById('studio-preview-checklist');
+      const saveNote = document.getElementById('studio-save-note');
+      const saveStatusChip = document.getElementById('studio-save-status-chip');
+      const naturalFlow = document.getElementById('studio-natural-flow');
+      const helperFocusStrip = document.getElementById('studio-helper-focus-strip');
+      const copilotPanel = document.getElementById('studio-copilot-panel');
+      const copilotPanelBody = document.getElementById('studio-copilot-panel-body');
+      const copilotCollapsedNote = document.getElementById('studio-copilot-collapsed-note');
+      const copilotHelperState = document.getElementById('studio-copilot-helper-state');
+      const toggleCopilotPanelButton = document.getElementById('studio-toggle-copilot-panel');
+      const inspectorPanel = document.getElementById('studio-inspector-panel');
+      const inspectorPanelBody = document.getElementById('studio-inspector-panel-body');
+      const inspectorCollapsedNote = document.getElementById('studio-inspector-collapsed-note');
+      const inspectorHelperState = document.getElementById('studio-inspector-helper-state');
+      const toggleInspectorPanelButton = document.getElementById('studio-toggle-inspector-panel');
+
+      const helperPanelPreference = {
+        copilot: null,
+        inspector: null,
+      };
 
       function escapeHtml(value) {
         return String(value)
@@ -324,6 +392,7 @@
         if (rerenderFlow !== false) {
           renderFlowEditor();
         }
+        renderFlowGuidance();
         renderInspectorPanel();
         renderDraftJson();
       }
@@ -334,6 +403,120 @@
 
       function cloneStarterNodes(methodKey) {
         return JSON.parse(JSON.stringify(studioCatalog[methodKey].starter_nodes));
+      }
+
+      function getPreviewGuideText(methodKey) {
+        return cachedPreviewMethods.has(methodKey)
+          ? 'Warm cache first, then run preview.'
+          : 'Run preview directly.';
+      }
+
+      function getPreviewResultEmptyState(methodKey) {
+        return cachedPreviewMethods.has(methodKey)
+          ? 'No preview yet. Warm cache, then run preview.'
+          : 'No preview yet. Run preview when ready.';
+      }
+
+      function getPreviewDependencySnapshot() {
+        return {
+          c_method: studioState.selected_method,
+          url: (studioState.workspace.target_url || '').trim(),
+          steps: studioState.flow.nodes.map((node) => node.step),
+          args: studioState.flow.nodes.map((node) => {
+            const value = (node.args || '').trim();
+            return value || '-';
+          }),
+        };
+      }
+
+      function getPreviewDependencySignature(snapshot) {
+        return JSON.stringify(snapshot || getPreviewDependencySnapshot());
+      }
+
+      function ensurePreviewMetadata() {
+        const hasPreviewResult = Boolean((studioState.preview.last_result || '').trim());
+        if (typeof studioState.preview.last_attempt_signature !== 'string') {
+          studioState.preview.last_attempt_signature = studioState.preview.status === 'ready' && hasPreviewResult
+            ? getPreviewDependencySignature()
+            : '';
+        }
+        if (!studioState.preview.last_attempt_snapshot) {
+          studioState.preview.last_attempt_snapshot = studioState.preview.last_attempt_signature
+            ? getPreviewDependencySnapshot()
+            : null;
+        }
+      }
+
+      function isValidTargetUrl(value) {
+        return /^https?:\/\//i.test((value || '').trim());
+      }
+
+      function hasNotificationEmail(value) {
+        return Boolean(value && value.indexOf('@') !== -1);
+      }
+
+      function isPreviewStale() {
+        const lastAttemptSignature = studioState.preview.last_attempt_signature || '';
+        if (!lastAttemptSignature) {
+          return false;
+        }
+        return lastAttemptSignature !== getPreviewDependencySignature();
+      }
+
+      function getPreviewStaleReason() {
+        if (!isPreviewStale()) {
+          return '';
+        }
+
+        const previous = studioState.preview.last_attempt_snapshot || {};
+        const current = getPreviewDependencySnapshot();
+        if (previous.c_method !== current.c_method) {
+          return 'Method changed. Run Preview again.';
+        }
+        if (previous.url !== current.url) {
+          return 'Target URL changed. Run Preview again.';
+        }
+        if (JSON.stringify(previous.steps || []) !== JSON.stringify(current.steps) || JSON.stringify(previous.args || []) !== JSON.stringify(current.args)) {
+          return 'Flow changed. Run Preview again.';
+        }
+        return 'Draft changed. Run Preview again.';
+      }
+
+      function getPreviewStaleGuideText() {
+        if (cachedPreviewMethods.has(studioState.selected_method) && studioState.preview.status === 'ready') {
+          return 'Cache is warm, but the output is stale. Run Preview again.';
+        }
+        return 'Output is stale. Run Preview again.';
+      }
+
+      function pluralize(value, singular, plural) {
+        return value === 1 ? singular : plural;
+      }
+
+      function getFlowArgumentIssueCount() {
+        return studioState.flow.nodes.reduce((count, node) => {
+          const stepMeta = getStepDefinition(node.step);
+          const args = (node.args || '').trim();
+          if (stepMeta.param_hint !== '-' && (!args || args === '-')) {
+            return count + 1;
+          }
+          return count;
+        }, 0);
+      }
+
+      function hasCompletedPreview() {
+        return studioState.preview.status === 'ready'
+          && Boolean((studioState.preview.last_result || '').trim())
+          && !isPreviewStale()
+          && studioState.preview.last_attempt_signature === getPreviewDependencySignature();
+      }
+
+      function scrollToStep(targetId) {
+        const target = document.getElementById(targetId);
+        if (!target) {
+          return;
+        }
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
 
       function pushEvent(type, title, detail, level) {
@@ -360,16 +543,398 @@
       function setButtonBusy(button, isBusy, busyLabel) {
         if (isBusy) {
           button.dataset.label = button.textContent;
+          button.dataset.busy = 'true';
           button.textContent = busyLabel;
           button.disabled = true;
           return;
         }
 
         button.textContent = button.dataset.label || button.textContent;
+        delete button.dataset.busy;
         button.disabled = false;
       }
 
+      function setGuardedButtonState(button, enabled, title) {
+        button.title = title || '';
+        if (button.dataset.busy === 'true') {
+          return;
+        }
+        button.disabled = !enabled;
+      }
+
+      function getReadinessModel() {
+        const targetReady = isValidTargetUrl(studioState.workspace.target_url);
+        const emailReady = hasNotificationEmail(studioState.workspace.notification_email);
+        const nodeCountValue = studioState.flow.nodes.length;
+        const flowIssueCount = getFlowArgumentIssueCount();
+        const flowReady = nodeCountValue > 0 && flowIssueCount === 0;
+        const previewDone = hasCompletedPreview();
+        const previewStale = isPreviewStale();
+        const goalReady = Boolean((copilotGoalInput.value || '').trim());
+
+        return {
+          targetReady,
+          emailReady,
+          nodeCountValue,
+          flowIssueCount,
+          flowReady,
+          previewDone,
+          previewStale,
+          goalReady,
+          setupReady: targetReady && emailReady,
+          inspectorReady: targetReady && nodeCountValue > 0,
+          previewReady: targetReady && emailReady && flowReady,
+          saveReady: previewDone && targetReady && emailReady && flowReady,
+          copilotReady: targetReady && goalReady,
+        };
+      }
+
+      function getMissingSetupText(readiness) {
+        if (!readiness.targetReady && !readiness.emailReady) {
+          return 'Add URL and email.';
+        }
+        if (!readiness.targetReady) {
+          return 'Add URL.';
+        }
+        return 'Add email.';
+      }
+
+      function getFlowBlockerText(readiness) {
+        if (!readiness.nodeCountValue) {
+          return 'Add at least one node.';
+        }
+        if (readiness.flowIssueCount) {
+          return 'Fill missing node values.';
+        }
+        return 'Flow is ready.';
+      }
+
+      function getInspectorBlockerText(readiness) {
+        if (!readiness.targetReady) {
+          return 'Add a target URL first.';
+        }
+        if (!readiness.nodeCountValue) {
+          return 'Keep at least one node in the flow.';
+        }
+        return 'Load Snapshot for the active node.';
+      }
+
+      function getCopilotBlockerText(readiness) {
+        if (!readiness.targetReady && !readiness.goalReady) {
+          return 'Add a target URL and goal first.';
+        }
+        if (!readiness.targetReady) {
+          return 'Add a target URL first.';
+        }
+        if (!readiness.goalReady) {
+          return 'Add a Copilot goal first.';
+        }
+        return 'Generate a starter draft.';
+      }
+
+      function getPreviewBlockerText(readiness) {
+        if (!readiness.setupReady) {
+          return getMissingSetupText(readiness);
+        }
+        if (!readiness.flowReady) {
+          return getFlowBlockerText(readiness);
+        }
+        if (readiness.previewStale) {
+          return getPreviewStaleReason();
+        }
+        return 'Run preview for the current draft.';
+      }
+
+      function getSaveBlockerText(readiness) {
+        if (!readiness.setupReady) {
+          return getMissingSetupText(readiness);
+        }
+        if (!readiness.flowReady) {
+          return getFlowBlockerText(readiness);
+        }
+        if (readiness.previewStale) {
+          return getPreviewStaleReason();
+        }
+        if (!readiness.previewDone) {
+          return 'Run Preview before saving.';
+        }
+        return 'Save the current draft.';
+      }
+
+      function getSelectedNodeArgumentState() {
+        const selectedNode = getSelectedNode();
+        if (!selectedNode) {
+          return {
+            selectedNode: null,
+            stepMeta: null,
+            argsMissing: false,
+          };
+        }
+
+        const stepMeta = getStepDefinition(selectedNode.step);
+        const argsValue = (selectedNode.args || '').trim();
+        return {
+          selectedNode,
+          stepMeta,
+          argsMissing: stepMeta.param_hint !== '-' && (!argsValue || argsValue === '-'),
+        };
+      }
+
+      function getHelperToolModel() {
+        const readiness = getReadinessModel();
+        const nodeState = getSelectedNodeArgumentState();
+        const copilotGoal = (copilotGoalInput.value || '').trim();
+        const copilotHasSuggestion = Boolean(
+          studioState.copilot
+            && studioState.copilot.suggestion
+            && studioState.copilot.suggestion.nodes
+            && studioState.copilot.suggestion.nodes.length
+        );
+        const inspectorHasSelection = Boolean(studioState.inspector && studioState.inspector.selection);
+        const inspectorReady = ['ready', 'armed'].indexOf(studioState.inspector.status) !== -1;
+        const inspectorLoading = studioState.inspector.status === 'loading';
+
+        const model = {
+          copilot: {
+            key: 'copilot',
+            title: 'Copilot',
+            state: 'pending',
+            badge: 'Optional',
+            note: 'Draft a starter flow.',
+            autoOpen: false,
+            blockerTargetId: 'studio-step-setup-panel',
+          },
+          inspector: {
+            key: 'inspector',
+            title: 'Snapshot',
+            state: 'pending',
+            badge: 'Optional',
+            note: 'Repair one node with a selector.',
+            autoOpen: false,
+            blockerTargetId: 'studio-step-flow-panel',
+          },
+        };
+
+        if (!readiness.targetReady) {
+          model.copilot.state = 'blocked';
+          model.copilot.badge = 'Need URL';
+          model.copilot.note = 'Add a target URL first.';
+        } else if (copilotHasSuggestion) {
+          model.copilot.state = 'complete';
+          model.copilot.badge = 'Draft ready';
+          model.copilot.note = 'Draft is ready to review.';
+          model.copilot.autoOpen = true;
+        } else if (!copilotGoal && !readiness.flowReady) {
+          model.copilot.state = 'attention';
+          model.copilot.badge = 'Add goal';
+          model.copilot.note = 'Add a goal if you want a starter draft.';
+          model.copilot.autoOpen = true;
+        } else if (copilotGoal) {
+          model.copilot.state = readiness.flowReady ? 'pending' : 'attention';
+          model.copilot.badge = readiness.flowReady ? 'Goal ready' : 'Helpful now';
+          model.copilot.note = readiness.flowReady
+            ? 'Open only if you want another draft.'
+            : 'Generate a draft if the flow still needs structure.';
+          model.copilot.autoOpen = !readiness.flowReady;
+        }
+
+        if (!readiness.targetReady) {
+          model.inspector.state = 'blocked';
+          model.inspector.badge = 'Need URL';
+          model.inspector.note = 'Add a target URL first.';
+          model.inspector.blockerTargetId = 'studio-step-setup-panel';
+        } else if (!nodeState.selectedNode) {
+          model.inspector.state = 'blocked';
+          model.inspector.badge = 'Need node';
+          model.inspector.note = 'Select a node first.';
+        } else if (inspectorLoading) {
+          model.inspector.state = 'attention';
+          model.inspector.badge = 'Loading';
+          model.inspector.note = 'Snapshot is loading.';
+          model.inspector.autoOpen = true;
+        } else if (inspectorHasSelection) {
+          model.inspector.state = 'complete';
+          model.inspector.badge = 'Candidate ready';
+          model.inspector.note = 'Apply a candidate to the active node.';
+          model.inspector.autoOpen = true;
+        } else if (inspectorReady) {
+          model.inspector.state = 'complete';
+          model.inspector.badge = 'Snapshot ready';
+          model.inspector.note = 'Click the page to generate candidates.';
+          model.inspector.autoOpen = true;
+        } else if (nodeState.argsMissing) {
+          model.inspector.state = 'attention';
+          model.inspector.badge = 'Needs selector';
+          model.inspector.note = 'This node still needs a selector.';
+          model.inspector.autoOpen = true;
+        } else {
+          model.inspector.note = 'Open only if you want to replace the current value.';
+        }
+
+        return model;
+      }
+
+      function isHelperPanelExpanded(toolKey, helperModel) {
+        if (helperPanelPreference[toolKey] !== null) {
+          return helperPanelPreference[toolKey];
+        }
+        return helperModel[toolKey].autoOpen;
+      }
+
+      function scrollToHelperPanel(toolKey) {
+        const panel = toolKey === 'copilot' ? copilotPanel : inspectorPanel;
+        if (!panel) {
+          return;
+        }
+        panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+
+      function setHelperPanelExpanded(toolKey, expanded) {
+        helperPanelPreference[toolKey] = expanded;
+        renderHelperPanels();
+        if (expanded) {
+          scrollToHelperPanel(toolKey);
+        }
+      }
+
+      function getHelperFocusNote(helperModel) {
+        if (helperModel.inspector.state === 'attention' || helperModel.inspector.state === 'complete') {
+          return 'Snapshot is the fastest next step for the active node.';
+        }
+        if (helperModel.copilot.state === 'attention' || helperModel.copilot.state === 'complete') {
+          return 'Copilot can draft a starter flow.';
+        }
+        if (helperModel.copilot.state === 'blocked' && helperModel.inspector.state === 'blocked') {
+          return 'Finish setup first.';
+        }
+        return 'Both helpers are optional.';
+      }
+
+      function renderNaturalFlow(helperModel) {
+        if (!naturalFlow) {
+          return;
+        }
+        const readiness = getReadinessModel();
+        const recommendedHelper = helperModel.inspector.state === 'attention' || helperModel.inspector.state === 'complete'
+          ? helperModel.inspector
+          : ((helperModel.copilot.state === 'attention' || helperModel.copilot.state === 'complete')
+            ? helperModel.copilot
+            : null);
+
+        const cards = [
+          {
+            order: '1',
+            state: readiness.flowReady ? 'complete' : 'attention',
+            title: readiness.flowReady ? 'Flow ready' : 'Fix flow',
+            note: readiness.flowReady
+              ? readiness.nodeCountValue + ' ' + pluralize(readiness.nodeCountValue, 'node ready.', 'nodes ready.')
+              : getFlowBlockerText(readiness),
+            actionLabel: 'Review flow',
+            targetId: 'studio-step-flow-panel',
+          },
+          {
+            order: '2',
+            state: recommendedHelper ? recommendedHelper.state : (helperModel.copilot.state === 'blocked' && helperModel.inspector.state === 'blocked' ? 'blocked' : 'pending'),
+            title: 'Helper',
+            note: recommendedHelper ? recommendedHelper.note : getHelperFocusNote(helperModel),
+            actionLabel: helperModel.copilot.state === 'blocked' && helperModel.inspector.state === 'blocked'
+              ? 'Fix setup'
+              : (recommendedHelper ? (recommendedHelper.key === 'inspector' ? 'Open Snapshot' : 'Open Copilot') : 'Skip helpers'),
+            targetId: helperModel.copilot.state === 'blocked' && helperModel.inspector.state === 'blocked'
+              ? 'studio-step-setup-panel'
+              : null,
+            helperKey: recommendedHelper ? recommendedHelper.key : null,
+          },
+          {
+            order: '3',
+            state: readiness.previewDone ? 'complete' : (readiness.previewStale ? 'attention' : (readiness.previewReady ? 'pending' : 'blocked')),
+            title: readiness.previewDone ? 'Preview ready' : (readiness.previewStale ? 'Refresh preview' : 'Run preview'),
+            note: readiness.previewDone
+              ? 'Current draft is verified.'
+              : getPreviewBlockerText(readiness),
+            actionLabel: 'Open preview',
+            targetId: 'studio-step-preview-panel',
+          },
+        ];
+
+        naturalFlow.innerHTML = cards.map((card) => {
+          const actionMarkup = card.helperKey
+            ? '<button type="button" class="btn btn-sm btn-outline-info" data-helper-key="' + escapeHtml(card.helperKey) + '">' + escapeHtml(card.actionLabel) + '</button>'
+            : (card.targetId
+              ? '<button type="button" class="btn btn-sm btn-outline-info" data-target-id="' + escapeHtml(card.targetId) + '">' + escapeHtml(card.actionLabel) + '</button>'
+              : '<span class="studio-natural-flow-skip">No action needed</span>');
+
+          return '<article class="studio-natural-flow-card is-' + escapeHtml(card.state) + '">'
+            + '<div class="studio-natural-flow-head">'
+            + '<span class="studio-natural-flow-order">' + escapeHtml(card.order) + '</span>'
+            + '<span class="studio-workflow-state is-' + escapeHtml(card.state) + '">' + escapeHtml(card.state === 'complete' ? 'Ready' : (card.state === 'blocked' ? 'Blocked' : (card.state === 'attention' ? 'Do this now' : 'Next up'))) + '</span>'
+            + '</div>'
+            + '<h4>' + escapeHtml(card.title) + '</h4>'
+            + '<p>' + escapeHtml(card.note) + '</p>'
+            + '<div class="studio-natural-flow-actions">' + actionMarkup + '</div>'
+            + '</article>';
+        }).join('');
+      }
+
+      function renderHelperPanels() {
+        const helperModel = getHelperToolModel();
+        const copilotExpanded = isHelperPanelExpanded('copilot', helperModel);
+        const inspectorExpanded = isHelperPanelExpanded('inspector', helperModel);
+
+        [
+          {
+            tool: helperModel.copilot,
+            expanded: copilotExpanded,
+            panel: copilotPanel,
+            body: copilotPanelBody,
+            collapsedNote: copilotCollapsedNote,
+            stateChip: copilotHelperState,
+            toggleButton: toggleCopilotPanelButton,
+          },
+          {
+            tool: helperModel.inspector,
+            expanded: inspectorExpanded,
+            panel: inspectorPanel,
+            body: inspectorPanelBody,
+            collapsedNote: inspectorCollapsedNote,
+            stateChip: inspectorHelperState,
+            toggleButton: toggleInspectorPanelButton,
+          },
+        ].forEach((item) => {
+          item.panel.classList.toggle('is-collapsed', !item.expanded);
+          item.panel.classList.toggle('is-blocked', item.tool.state === 'blocked');
+          item.body.hidden = !item.expanded;
+          item.collapsedNote.hidden = item.expanded;
+          item.collapsedNote.textContent = item.tool.note;
+          item.stateChip.textContent = item.tool.badge;
+          item.stateChip.className = 'studio-workflow-state is-' + item.tool.state;
+          item.toggleButton.textContent = item.expanded ? 'Collapse' : 'Open panel';
+          item.toggleButton.setAttribute('aria-expanded', item.expanded ? 'true' : 'false');
+          item.toggleButton.setAttribute('title', item.tool.note);
+        });
+      }
+
+      function renderActionAvailability() {
+        const readiness = getReadinessModel();
+        const usesCache = cachedPreviewMethods.has(studioState.selected_method);
+
+        setGuardedButtonState(runCopilotButton, readiness.copilotReady, getCopilotBlockerText(readiness));
+        setGuardedButtonState(loadInspectorButton, readiness.inspectorReady, getInspectorBlockerText(readiness));
+        setGuardedButtonState(runPreviewButton, readiness.previewReady, getPreviewBlockerText(readiness));
+        setGuardedButtonState(
+          primePreviewButton,
+          usesCache && readiness.previewReady,
+          usesCache
+            ? getPreviewBlockerText(readiness)
+            : 'Warm Cache is only used for Requests and LLM methods.'
+        );
+        setGuardedButtonState(saveTaskButton, readiness.saveReady, getSaveBlockerText(readiness));
+      }
+
       function renderDraftJson() {
+        if (!jsonOutput) {
+          return;
+        }
         jsonOutput.textContent = JSON.stringify(studioState, null, 2);
       }
 
@@ -396,12 +961,15 @@
         const selectedNode = getSelectedNode();
         const selection = studioState.inspector.selection;
         const applyUnsupported = studioState.selected_method === 'py_llm';
+        const emptyMessage = studioState.inspector.status === 'ready' || studioState.inspector.status === 'armed'
+          ? 'Click any element in the page snapshot to generate CSS or XPath candidates for the selected node.'
+          : 'Load Snapshot to fetch the current page, then click any element to generate CSS or XPath candidates for the selected node.';
 
         activeNodeChip.textContent = selectedNode ? 'Node ' + (getSelectedNodeIndex() + 1) + ': ' + selectedNode.title : 'No node selected';
 
         const summaryParts = [
           '<strong>Inspector status:</strong> ' + escapeHtml(studioState.inspector.status || 'idle'),
-          '<div>' + escapeHtml(studioState.inspector.source_note || 'Load a snapshot to start selecting elements.') + '</div>',
+          '<div>' + escapeHtml(studioState.inspector.source_note || 'Load Snapshot to fetch the current page, then click an element to generate selector candidates.') + '</div>',
         ];
 
         if (selection && selection.tag) {
@@ -418,9 +986,11 @@
         }
 
         inspectorSummary.innerHTML = summaryParts.join('');
+        renderActionAvailability();
 
         if (!selection || !selection.candidates || !selection.candidates.length) {
-          inspectorCandidates.innerHTML = '<div class="studio-empty-state">Click an element inside the inspector snapshot to generate selector candidates.</div>';
+          inspectorCandidates.innerHTML = '<div class="studio-empty-state">' + escapeHtml(emptyMessage) + '</div>';
+          renderHelperPanels();
           return;
         }
 
@@ -440,14 +1010,18 @@
             + '</div>'
             + '</article>';
         }).join('');
+        renderHelperPanels();
       }
 
       function renderMemoryPanel() {
+        if (!memoryNote || !memoryList) {
+          return;
+        }
         const healing = studioState.healing || { memory_items: [], memory_note: '' };
-        memoryNote.textContent = healing.memory_note || 'Run previews or successful crawls to build selector memory for this domain.';
+        memoryNote.textContent = healing.memory_note || 'Run preview to build selector memory.';
 
         if (!healing.memory_items || !healing.memory_items.length) {
-          memoryList.innerHTML = '<div class="studio-empty-state">No selector memory for the current domain and method yet.</div>';
+          memoryList.innerHTML = '<div class="studio-empty-state">No selector memory yet.</div>';
           return;
         }
 
@@ -475,14 +1049,19 @@
         }
 
         copilotSourceChip.textContent = copilot.source || 'template';
-        copilotNote.textContent = copilot.note || 'Describe the data you want and Copilot will draft a flow for the currently selected runtime.';
+        copilotNote.textContent = copilot.note || 'Describe the result you want, then generate a draft.';
 
         const suggestion = copilot.suggestion;
         const hasSuggestion = Boolean(suggestion && suggestion.nodes && suggestion.nodes.length);
         applyCopilotButton.disabled = !hasSuggestion;
+        applyCopilotButton.title = hasSuggestion
+          ? 'Replace the current flow nodes with this suggestion.'
+          : 'Generate a draft flow before replacing the current nodes.';
 
         if (!hasSuggestion) {
-          copilotList.innerHTML = '<div class="studio-empty-state">No suggestion yet. Add a target URL, describe the data you want, then generate a draft flow.</div>';
+          copilotList.innerHTML = '<div class="studio-empty-state">No draft yet. Add a URL, write a goal, then generate one.</div>';
+          renderActionAvailability();
+          renderHelperPanels();
           return;
         }
 
@@ -491,8 +1070,7 @@
           + '<strong>' + escapeHtml(suggestion.task_name || 'Studio Copilot Flow') + '</strong>'
           + '<span>' + escapeHtml(suggestion.source || copilot.source || 'template') + (suggestion.memory_hits ? ' / ' + escapeHtml(suggestion.memory_hits + ' memory hits') : '') + '</span>'
           + '</div>'
-          + '<p>' + escapeHtml(suggestion.headline || 'Copilot drafted a new flow suggestion.') + '</p>'
-          + '<p>' + escapeHtml(suggestion.rationale || copilot.note || '') + '</p>'
+          + '<p>' + escapeHtml(suggestion.headline || 'Draft ready.') + '</p>'
           + '<div class="studio-copilot-node-list">'
           + suggestion.nodes.map((node, index) => {
             return '<article class="studio-copilot-node">'
@@ -506,9 +1084,14 @@
           }).join('')
           + '</div>'
           + '</article>';
+        renderActionAvailability();
+        renderHelperPanels();
       }
 
       function renderEventLedger() {
+        if (!eventList) {
+          return;
+        }
         eventList.innerHTML = studioState.run.events.map((event) => {
           return '<article class="studio-event-item studio-level-' + escapeHtml(event.level) + '">'
             + '<strong>' + escapeHtml(event.title) + '</strong>'
@@ -525,36 +1108,301 @@
         });
 
         methodDetail.innerHTML = [
-          '<div class="studio-method-focus">',
-          '<div>',
-          '<p class="studio-panel-kicker">Active runtime</p>',
-          '<h4>' + escapeHtml(method.label) + '</h4>',
+          '<div class="studio-method-focus studio-method-focus-inline">',
+          '<div class="studio-method-summary">',
+          '<p class="studio-panel-kicker">Current</p>',
+          '<strong>' + escapeHtml(method.label) + '</strong>',
           '<p>' + escapeHtml(method.summary) + '</p>',
           '</div>',
-          '<div class="studio-strengths">' + method.strengths.map((strength) => '<span>' + escapeHtml(strength) + '</span>').join('') + '</div>',
+          '<div class="studio-method-meta">',
+          '<span class="studio-chip">' + escapeHtml(method.engine_label) + '</span>',
           '</div>',
-          '<div class="studio-step-card-grid">' + method.step_cards.slice(0, 6).map((step) => {
-            return '<article class="studio-step-card">'
-              + '<strong>' + escapeHtml(step.label) + '</strong>'
-              + '<span>' + escapeHtml(step.group) + '</span>'
-              + '<code>' + escapeHtml(step.step) + '</code>'
-              + '<p>' + escapeHtml(step.description) + '</p>'
-              + '</article>';
-          }).join('') + '</div>'
+          '</div>'
         ].join('');
+      }
+
+      function getWorkflowStatusModel() {
+        const method = getCurrentMethodDefinition();
+        const readiness = getReadinessModel();
+        const targetReady = isValidTargetUrl(studioState.workspace.target_url);
+        const emailReady = hasNotificationEmail(studioState.workspace.notification_email);
+        const setupReady = targetReady && emailReady;
+        const nodeCountValue = studioState.flow.nodes.length;
+        const flowIssueCount = getFlowArgumentIssueCount();
+        const flowReady = nodeCountValue > 0 && flowIssueCount === 0;
+        const previewDone = hasCompletedPreview();
+        const usesCache = cachedPreviewMethods.has(studioState.selected_method);
+
+        const setupState = setupReady ? 'complete' : 'attention';
+        const setupBadge = setupReady
+          ? 'Ready'
+          : (!targetReady && !emailReady ? 'Need URL + email' : (!targetReady ? 'Need URL' : 'Need email'));
+        const setupNote = setupReady
+          ? 'URL + email ready.'
+          : (!targetReady && !emailReady
+            ? 'Add URL + email.'
+            : (!targetReady ? 'Add URL.' : 'Add email.'));
+        const setupAction = setupReady
+          ? 'Go to flow.'
+          : (!targetReady && !emailReady
+            ? 'Fill both fields.'
+            : (!targetReady ? 'Fill target URL.' : 'Fill notification email.'));
+
+        const flowState = flowReady ? 'complete' : 'attention';
+        const flowBadge = flowReady
+          ? nodeCountValue + ' ' + pluralize(nodeCountValue, 'node ready', 'nodes ready')
+          : (flowIssueCount
+            ? flowIssueCount + ' missing ' + pluralize(flowIssueCount, 'value', 'values')
+            : 'Need nodes');
+        const flowNote = flowReady
+          ? nodeCountValue + ' ' + pluralize(nodeCountValue, 'node ready.', 'nodes ready.')
+          : (flowIssueCount
+            ? 'Fill missing values.'
+            : 'Add at least one node.');
+        const flowAction = flowReady
+          ? 'Review node order.'
+          : (flowIssueCount
+            ? 'Fill required values.'
+            : 'Add the nodes you need.');
+
+        let previewState = 'pending';
+        let previewBadge = usesCache ? 'Warm, then run' : 'Ready to run';
+        let previewNote = usesCache
+          ? 'Warm cache first.'
+          : 'Ready to run.';
+        let previewAction = usesCache
+          ? 'Warm cache, then run preview.'
+          : 'Run preview.';
+
+        if (!setupReady) {
+          previewState = 'blocked';
+          previewBadge = 'Blocked';
+          previewNote = 'Setup incomplete.';
+          previewAction = setupAction;
+        } else if (!flowReady) {
+          previewState = 'blocked';
+          previewBadge = 'Blocked';
+          previewNote = 'Flow incomplete.';
+          previewAction = flowAction;
+        } else if (readiness.previewStale) {
+          previewState = 'attention';
+          previewBadge = 'Preview stale';
+          previewNote = getPreviewStaleReason();
+          previewAction = 'Run preview again.';
+        } else if (studioState.preview.status === 'error') {
+          previewState = 'attention';
+          previewBadge = 'Preview failed';
+          previewNote = studioState.preview.detail || 'The last preview failed. Repair the flow and try again.';
+          previewAction = 'Repair the issue and run again.';
+        } else if (previewDone) {
+          previewState = 'complete';
+          previewBadge = 'Preview complete';
+          previewNote = 'Preview verified.';
+          previewAction = 'Continue to save.';
+        } else if (usesCache && studioState.preview.status === 'ready') {
+          previewState = 'pending';
+          previewBadge = 'Ready to run';
+          previewNote = 'Cache is ready.';
+          previewAction = 'Run preview.';
+        }
+
+        let saveState = 'blocked';
+        let saveBadge = 'Preview first';
+        let saveNote = 'Preview first.';
+        let saveAction = 'Run preview first.';
+
+        if (!setupReady || !flowReady) {
+          saveBadge = 'Blocked';
+          saveNote = 'Setup or flow is incomplete.';
+          saveAction = !setupReady ? setupAction : flowAction;
+        } else if (readiness.previewStale) {
+          saveBadge = 'Preview stale';
+          saveNote = getPreviewStaleReason();
+          saveAction = 'Run preview again.';
+        } else if (previewDone) {
+          saveState = 'pending';
+          saveBadge = 'Ready to save';
+          saveNote = 'Ready to save.';
+          saveAction = 'Save when ready.';
+        }
+
+        const steps = [
+          {
+            number: 1,
+            title: 'Choose method',
+            state: 'complete',
+            badge: method.label,
+            note: method.engine_label,
+            action: 'Switch only if needed.',
+            targetId: 'studio-step-method-panel',
+          },
+          {
+            number: 2,
+            title: 'Set task basics',
+            state: setupState,
+            badge: setupBadge,
+            note: setupNote,
+            action: setupAction,
+            targetId: 'studio-step-setup-panel',
+          },
+          {
+            number: 3,
+            title: 'Build steps',
+            state: flowState,
+            badge: flowBadge,
+            note: flowNote,
+            action: flowAction,
+            targetId: 'studio-step-flow-panel',
+          },
+          {
+            number: 4,
+            title: 'Run preview',
+            state: previewState,
+            badge: previewBadge,
+            note: previewNote,
+            action: previewAction,
+            targetId: 'studio-step-preview-panel',
+          },
+          {
+            number: 5,
+            title: 'Save task',
+            state: saveState,
+            badge: saveBadge,
+            note: saveNote,
+            action: saveAction,
+            targetId: 'studio-step-save-panel',
+          },
+        ];
+
+        let nextStep = steps[1];
+        if (setupReady && !flowReady) {
+          nextStep = steps[2];
+        } else if (setupReady && flowReady && !previewDone) {
+          nextStep = steps[3];
+        } else if (setupReady && flowReady && previewDone) {
+          nextStep = steps[4];
+        }
+
+        return { steps, nextStep };
+      }
+
+      function renderWorkflowOverview() {
+        if (!nextStepCard || !workflowMap || !workflowSummaryChip) {
+          return;
+        }
+        const workflow = getWorkflowStatusModel();
+        const nextStep = workflow.nextStep;
+
+        workflowSummaryChip.textContent = 'Next: Step ' + nextStep.number;
+
+        nextStepCard.innerHTML = '<p class="studio-panel-kicker">Next</p>'
+          + '<div class="studio-next-step-head">'
+          + '<strong>Step ' + escapeHtml(nextStep.number) + '. ' + escapeHtml(nextStep.title) + '</strong>'
+          + '<span class="studio-workflow-state is-' + escapeHtml(nextStep.state) + '">' + escapeHtml(nextStep.badge) + '</span>'
+          + '</div>'
+          + '<button type="button" class="btn btn-sm btn-outline-info" data-target-id="' + escapeHtml(nextStep.targetId) + '">Open</button>';
+
+        workflowMap.innerHTML = workflow.steps.map((step) => {
+          return '<button type="button" class="studio-workflow-card is-' + escapeHtml(step.state) + '" data-target-id="' + escapeHtml(step.targetId) + '">'
+            + '<div class="studio-workflow-card-top">'
+            + '<span class="studio-workflow-step-no">Step ' + escapeHtml(step.number) + '</span>'
+            + '<span class="studio-workflow-state is-' + escapeHtml(step.state) + '">' + escapeHtml(step.badge) + '</span>'
+            + '</div>'
+            + '<strong>' + escapeHtml(step.title) + '</strong>'
+            + '<p>' + escapeHtml(step.note) + '</p>'
+            + '</button>';
+        }).join('');
+      }
+
+      function renderFlowGuidance() {
+        if (!nodeMissionCard) {
+          return;
+        }
+
+        const selectedNode = getSelectedNode();
+
+        if (!selectedNode) {
+          nodeMissionCard.innerHTML = '';
+          return;
+        }
+
+        const nodeIndex = getSelectedNodeIndex() + 1;
+        const stepMeta = getStepDefinition(selectedNode.step);
+        const argsMissing = stepMeta.param_hint !== '-' && (!selectedNode.args || !selectedNode.args.trim() || selectedNode.args.trim() === '-');
+        const missionBadge = argsMissing ? 'Needs value' : 'Ready';
+        const missionHeadline = 'Node ' + nodeIndex;
+        const missionBody = argsMissing
+          ? 'Add a selector or value for this node.'
+          : 'This node is ready for preview.';
+        const missionNote = argsMissing
+          ? 'Expected: ' + (stepMeta.param_hint || '-')
+          : 'Current value: ' + (selectedNode.args || '-');
+
+        nodeMissionCard.innerHTML = '<p class="studio-panel-kicker">Active node</p>'
+          + '<div class="studio-mission-head">'
+          + '<h3>' + escapeHtml(missionHeadline) + '</h3>'
+          + '<span class="studio-workflow-state is-' + escapeHtml(argsMissing ? 'attention' : 'complete') + '">' + escapeHtml(missionBadge) + '</span>'
+          + '</div>'
+          + '<p>' + escapeHtml(missionBody) + '</p>'
+          + '<div class="studio-mission-meta">'
+          + '<span>' + escapeHtml(selectedNode.title) + '</span>'
+          + '<code>' + escapeHtml(stepMeta.step) + '</code>'
+          + '</div>'
+          + '<p class="studio-section-guide">' + escapeHtml(missionNote) + '</p>';
+      }
+
+      function renderPreviewChecklist() {
+        const readiness = getReadinessModel();
+        if (previewChecklist) {
+          previewChecklist.innerHTML = '';
+        }
+
+        saveStatusChip.textContent = readiness.saveReady ? 'Ready to save' : (readiness.previewStale ? 'Preview stale' : 'Preview first');
+        saveNote.textContent = readiness.saveReady
+          ? 'Preview verified. Save when ready.'
+          : getSaveBlockerText(readiness);
       }
 
       function renderPreviewPanel() {
         const method = getCurrentMethodDefinition();
+        const usesCache = cachedPreviewMethods.has(studioState.selected_method);
+        const readiness = getReadinessModel();
+        const previewStale = readiness.previewStale;
+        const effectivePreviewStatus = previewStale ? 'stale' : studioState.preview.status;
+        const staleReason = previewStale ? getPreviewStaleReason() : '';
         titleHeading.textContent = studioState.workspace.title || 'Untitled Studio Flow';
         previewMode.textContent = method.preview_mode;
         previewMethodName.textContent = method.label;
-        previewHeadline.textContent = studioState.preview.headline;
-        previewStatus.textContent = studioState.preview.status;
-        previewTitle.textContent = studioState.workspace.target_url ? 'Preview surface for ' + method.label : 'URL and preview cache will appear here';
+        previewHeadline.textContent = previewStale ? 'Preview stale' : 'Preview';
+        previewStatus.textContent = effectivePreviewStatus;
+        previewStatus.className = 'studio-preview-label is-' + effectivePreviewStatus;
+        previewStatusCopy.textContent = effectivePreviewStatus;
+        previewTitle.textContent = previewStale && studioState.workspace.target_url
+          ? 'Draft changed after the last preview'
+          : (studioState.workspace.target_url ? 'Preview surface for ' + method.label : 'Preview output will appear here');
         previewTarget.textContent = studioState.workspace.target_url || 'No target URL yet';
-        previewDetail.textContent = studioState.preview.detail;
-        previewResult.textContent = studioState.preview.last_result || 'No preview run yet. Prime cache for Requests / LLM, or run a live browser preview for Selenium / Playwright.';
+        previewTargetSummary.textContent = studioState.workspace.target_url || 'No target URL yet';
+        previewStageNote.textContent = studioState.workspace.target_url
+          ? 'Uses the current method, URL, and nodes.'
+          : 'Add a target URL first.';
+        previewDetail.textContent = previewStale ? staleReason : studioState.preview.detail;
+        previewGuide.textContent = previewStale ? getPreviewStaleGuideText() : getPreviewGuideText(studioState.selected_method);
+        previewResult.textContent = previewStale && (studioState.preview.last_result || '').trim()
+          ? 'Stale preview output. Run Preview again.\n\n' + studioState.preview.last_result
+          : (studioState.preview.last_result || getPreviewResultEmptyState(studioState.selected_method));
+        previewResult.classList.toggle('is-stale', previewStale);
+        if (!previewStale && studioState.preview.status === 'idle' && !readiness.previewReady) {
+          previewDetail.textContent = getPreviewBlockerText(readiness);
+          previewGuide.textContent = readiness.setupReady
+            ? getFlowBlockerText(readiness)
+            : getMissingSetupText(readiness);
+        }
+        if (usesCache && readiness.previewReady && !previewStale && studioState.preview.status === 'idle') {
+          previewGuide.textContent = 'Warm cache first, then run preview.';
+        }
+        renderPreviewChecklist();
+        renderActionAvailability();
+        renderWorkflowOverview();
       }
 
       function buildStepOptions(selectedStep) {
@@ -566,6 +1414,7 @@
 
       function renderFlowEditor() {
         nodeCount.textContent = studioState.flow.nodes.length + ' nodes';
+        previewNodeSummary.textContent = studioState.flow.nodes.length + ' nodes';
         flowList.innerHTML = studioState.flow.nodes.map((node, index) => {
           const stepMeta = getStepDefinition(node.step);
           const isActive = index === getSelectedNodeIndex();
@@ -573,31 +1422,35 @@
             + '<div class="studio-editor-header">'
             + '<span class="studio-flow-index">' + (index + 1) + '</span>'
             + '<div class="studio-node-actions">'
-            + '<span class="studio-chip">' + (isActive ? 'Active target' : 'Pick target') + '</span>'
-            + '<button type="button" class="btn btn-sm btn-outline-danger" data-action="remove-node"' + (studioState.flow.nodes.length === 1 ? ' disabled' : '') + '>Remove</button>'
+            + '<span class="studio-chip">' + (isActive ? 'Selected node' : 'Click to select') + '</span>'
+            + '<button type="button" class="btn btn-sm btn-outline-danger" data-action="remove-node" title="Delete this node from the current flow"' + (studioState.flow.nodes.length === 1 ? ' disabled' : '') + '>Remove</button>'
             + '</div>'
             + '</div>'
             + '<div class="studio-editor-grid">'
             + '<label class="studio-field">'
-            + '<span>Node title</span>'
-            + '<input type="text" class="form-control" data-field="title" value="' + escapeHtml(node.title) + '">'
+            + '<span>Title</span>'
+            + '<input type="text" class="form-control form-control-sm" data-field="title" value="' + escapeHtml(node.title) + '">'
             + '</label>'
             + '<label class="studio-field">'
             + '<span>Step</span>'
-            + '<select class="form-control" data-field="step">' + buildStepOptions(node.step) + '</select>'
+            + '<select class="form-control form-control-sm" data-field="step">' + buildStepOptions(node.step) + '</select>'
             + '</label>'
             + '<label class="studio-field studio-field-span-2">'
             + '<span>Arguments</span>'
-            + '<input type="text" class="form-control" data-field="args" placeholder="' + escapeHtml(stepMeta.param_hint || '-') + '" value="' + escapeHtml(node.args) + '">'
+            + '<input type="text" class="form-control form-control-sm" data-field="args" placeholder="' + escapeHtml(stepMeta.param_hint || '-') + '" value="' + escapeHtml(node.args) + '">'
             + '</label>'
             + '<label class="studio-field studio-field-span-2">'
             + '<span>Intent</span>'
-            + '<input type="text" class="form-control" data-field="intent" value="' + escapeHtml(node.intent) + '">'
+            + '<input type="text" class="form-control form-control-sm" data-field="intent" value="' + escapeHtml(node.intent) + '">'
             + '</label>'
             + '</div>'
             + '<p class="studio-node-hint">' + escapeHtml(stepMeta.description) + '</p>'
             + '</article>';
         }).join('');
+        renderFlowGuidance();
+        renderActionAvailability();
+        renderWorkflowOverview();
+        renderHelperPanels();
       }
 
       function syncWorkspaceState() {
@@ -608,25 +1461,29 @@
 
         if (previousTargetUrl !== studioState.workspace.target_url) {
           studioState.healing.memory_status = 'idle';
-          studioState.healing.memory_note = 'Run previews or successful crawls to build selector memory for this domain.';
+          studioState.healing.memory_note = 'Run preview to build selector memory.';
           studioState.healing.memory_items = [];
           studioState.copilot.status = 'idle';
           studioState.copilot.source = 'template';
-          studioState.copilot.note = 'Target URL changed. Generate a fresh copilot plan for the new surface.';
+          studioState.copilot.note = 'Target URL changed. Generate a new draft if needed.';
           studioState.copilot.suggestion = null;
           renderMemoryPanel();
           renderCopilotPanel();
         }
 
         if (studioState.workspace.target_url) {
-          studioState.preview.headline = 'Workspace is configured for ' + studioState.selected_method;
-          studioState.preview.detail = 'Use Prime Preview for cached methods or run the flow directly for browser runtimes.';
+          studioState.preview.headline = 'Preview is ready';
+          studioState.preview.detail = cachedPreviewMethods.has(studioState.selected_method)
+            ? 'Warm cache first, then run preview.'
+            : 'Run Preview to test the current nodes.';
         } else {
-          studioState.preview.headline = 'Preview stage is waiting for a target URL';
-          studioState.preview.detail = 'Add a target URL before warming the cache or running a preview.';
+          studioState.preview.headline = 'Preview is waiting for a target URL';
+          studioState.preview.detail = 'Add a target URL first.';
         }
 
         renderPreviewPanel();
+        renderFlowGuidance();
+        renderCopilotPanel();
         renderDraftJson();
       }
 
@@ -701,8 +1558,8 @@
         const payload = buildPreviewPayload();
         if (!cachedPreviewMethods.has(payload.c_method)) {
           studioState.preview.status = 'live';
-          studioState.preview.headline = 'Live browser preview selected';
-          studioState.preview.detail = 'Browser methods use the live preview pipeline and do not need HTML cache warmup.';
+          studioState.preview.headline = 'Warm cache is not required';
+          studioState.preview.detail = 'Run Preview directly for Selenium and Playwright methods.';
           pushEvent('preview.live_ready', 'Live preview selected', 'Studio will run the current nodes directly against a live browser runtime.', 'info');
           renderPreviewPanel();
           return 'live-preview';
@@ -713,8 +1570,8 @@
         }
 
         studioState.preview.status = 'warming';
-        studioState.preview.headline = 'Caching preview surface';
-        studioState.preview.detail = 'Fetching the latest HTML snapshot for Requests / LLM preview.';
+  studioState.preview.headline = 'Warming cached preview surface';
+  studioState.preview.detail = 'Fetching fresh HTML for Requests and LLM preview.';
         renderPreviewPanel();
         pushEvent('preview.cache_requested', 'Preview cache requested', 'Studio asked the existing cache pipeline to refresh the preview surface.', 'info');
 
@@ -734,8 +1591,8 @@
             }
 
             studioState.preview.status = 'ready';
-            studioState.preview.headline = 'Preview cache primed';
-            studioState.preview.detail = 'Cached HTML is ready for Studio preview runs.';
+            studioState.preview.headline = 'Cache is ready';
+            studioState.preview.detail = 'Cached HTML is ready. Run Preview to test the current flow.';
             pushEvent('preview.cached', 'Preview cache primed', 'Studio refreshed the preview cache for the current draft.', 'success');
             clearFeedback();
             return body;
@@ -763,6 +1620,8 @@
 
         try {
           const payload = buildPreviewPayload();
+          studioState.preview.last_attempt_signature = getPreviewDependencySignature();
+          studioState.preview.last_attempt_snapshot = getPreviewDependencySnapshot();
           if (cachedPreviewMethods.has(payload.c_method)) {
             await primePreviewCache(false);
           }
@@ -808,12 +1667,18 @@
       async function loadInspector(forceRefresh) {
         setButtonBusy(loadInspectorButton, true, 'Loading...');
         clearFeedback();
+        inspectorFrameWrap.classList.add('is-loading');
 
         try {
           syncWorkspaceState();
           if (!studioState.workspace.target_url || !/^https?:\/\//i.test(studioState.workspace.target_url)) {
             throw new Error('Target URL must start with http:// or https://');
           }
+
+          studioState.inspector.status = 'loading';
+          studioState.inspector.source_note = 'Loading a page snapshot so you can click elements and generate selectors.';
+          studioState.inspector.selection = null;
+          renderInspectorPanel();
 
           const response = await fetch("{{ url_for('studio_inspector') }}", {
             method: 'POST',
@@ -836,7 +1701,7 @@
           studioState.inspector.source_note = body.note;
           studioState.inspector.selection = null;
           pushEvent('inspector.loaded', 'Inspector snapshot loaded', 'Studio loaded a clickable snapshot for DOM inspection.', 'success');
-          setFeedback('Inspector snapshot loaded. Click an element in the frame to generate selector candidates.', 'success');
+          setFeedback('Page snapshot loaded. Click an element in the frame to generate selector candidates.', 'success');
         } catch (error) {
           studioState.inspector.status = 'error';
           studioState.inspector.source_note = error.message;
@@ -844,6 +1709,7 @@
           pushEvent('inspector.failed', 'Inspector load failed', error.message, 'danger');
           setFeedback(error.message, 'danger');
         } finally {
+          inspectorFrameWrap.classList.remove('is-loading');
           setButtonBusy(loadInspectorButton, false);
           renderInspectorPanel();
           renderDraftJson();
@@ -869,7 +1735,9 @@
           return;
         }
 
-        setButtonBusy(refreshMemoryButton, true, 'Loading...');
+        if (refreshMemoryButton) {
+          setButtonBusy(refreshMemoryButton, true, 'Loading...');
+        }
 
         try {
           const response = await fetch("{{ url_for('studio_selector_memory') }}", {
@@ -896,7 +1764,9 @@
           studioState.healing.memory_note = error.message;
           setFeedback(error.message, 'danger');
         } finally {
-          setButtonBusy(refreshMemoryButton, false);
+          if (refreshMemoryButton) {
+            setButtonBusy(refreshMemoryButton, false);
+          }
           renderMemoryPanel();
           renderDraftJson();
         }
@@ -968,6 +1838,9 @@
           setFeedback('Generate a copilot suggestion before applying it.', 'warning');
           return;
         }
+        if (!window.confirm('Replace the current flow nodes with the Copilot suggestion?')) {
+          return;
+        }
 
         studioState.flow.nodes = suggestion.nodes.map((node, index) => ({
           id: node.id || ('copilot-node-' + (index + 1)),
@@ -981,15 +1854,15 @@
         studioState.inspector.selected_node_index = 0;
         studioState.inspector.selection = null;
         studioState.copilot.status = 'applied';
-        studioState.copilot.note = 'Suggestion applied. Refine selectors in the flow editor or inspector before saving the task.';
+        studioState.copilot.note = 'Suggestion applied. Review each node, refine selectors in the page snapshot, then save the task.';
 
         pushEvent(
           'copilot.applied',
           'Copilot suggestion applied',
-          'Studio replaced the current blueprint with the copilot draft so you can refine it in place.',
+          'Studio replaced the current nodes with the Copilot draft. Review each node before saving.',
           'success'
         );
-        setFeedback('Copilot suggestion applied to the flow editor.', 'success');
+        setFeedback('Copilot suggestion replaced the current flow.', 'success');
         renderFlowEditor();
         renderPreviewPanel();
         renderInspectorPanel();
@@ -1032,6 +1905,10 @@
         clearFeedback();
 
         try {
+          const readiness = getReadinessModel();
+          if (!readiness.saveReady) {
+            throw new Error(getSaveBlockerText(readiness));
+          }
           const payload = buildStudioPayload();
           const response = await fetch("{{ url_for('studio_task') }}", {
             method: 'POST',
@@ -1044,7 +1921,7 @@
           }
 
           const message = escapeHtml(body.message || 'Studio task saved.');
-          const redirectUrl = escapeHtml(body.redirect_url || '{{ url_for('contents') }}');
+          const redirectUrl = escapeHtml(body.redirect_url || "{{ url_for('contents') }}");
           const level = body.status === 'queued' ? 'success' : 'warning';
           pushEvent('task.saved', 'Studio task saved', message, level === 'success' ? 'success' : 'warning');
           setFeedback(message + ' <a href="' + redirectUrl + '" class="studio-feedback-link">Open tasks</a>', level, true);
@@ -1063,24 +1940,33 @@
             return;
           }
 
+          const nextMethod = studioCatalog[card.dataset.method];
+          if (!window.confirm('Switch to ' + nextMethod.label + '? This resets the current flow nodes, preview output, Copilot draft, and selector memory view.')) {
+            return;
+          }
+
           studioState.selected_method = card.dataset.method;
           studioState.flow.nodes = cloneStarterNodes(studioState.selected_method);
           studioState.preview.preview_mode = getCurrentMethodDefinition().preview_mode;
           studioState.preview.status = 'idle';
           studioState.preview.last_result = '';
+          studioState.preview.last_attempt_signature = '';
+          studioState.preview.last_attempt_snapshot = null;
           studioState.preview.headline = 'Method switched to ' + getCurrentMethodDefinition().label;
-          studioState.preview.detail = 'Starter nodes were reset to match the selected runtime.';
+          studioState.preview.detail = 'Starter nodes were reset to match the selected method.';
           studioState.inspector.status = 'idle';
-          studioState.inspector.source_note = 'Load an inspector snapshot to pick elements and apply selectors to the active flow node.';
+          studioState.inspector.source_note = 'Load Snapshot to fetch the page and apply selectors to the selected node.';
           studioState.inspector.selection = null;
           studioState.inspector.selected_node_index = 0;
           studioState.copilot.status = 'idle';
           studioState.copilot.source = 'template';
-          studioState.copilot.note = 'Method changed. Generate a new copilot plan tailored to the selected runtime.';
+          studioState.copilot.note = 'Method changed. Generate a new draft if needed.';
           studioState.copilot.suggestion = null;
           studioState.healing.memory_status = 'idle';
-          studioState.healing.memory_note = 'Run previews or successful crawls to build selector memory for this domain.';
+          studioState.healing.memory_note = 'Run preview to build selector memory.';
           studioState.healing.memory_items = [];
+          helperPanelPreference.copilot = null;
+          helperPanelPreference.inspector = null;
           inspectorFrame.srcdoc = '';
           pushEvent('workspace.method_changed', 'Method switched', 'Studio reset the flow blueprint for the newly selected runtime.', 'info');
           renderMethodDetail();
@@ -1101,9 +1987,11 @@
 
       copilotGoalInput.addEventListener('input', () => {
         studioState.copilot.goal = copilotGoalInput.value;
+        renderActionAvailability();
+        renderHelperPanels();
         if (studioState.copilot.suggestion) {
           studioState.copilot.status = 'idle';
-          studioState.copilot.note = 'Goal changed. Generate a fresh copilot plan to match the updated request.';
+          studioState.copilot.note = 'Goal changed. Generate a fresh draft if needed.';
           studioState.copilot.suggestion = null;
           renderCopilotPanel();
           renderDraftJson();
@@ -1124,6 +2012,9 @@
 
         setSelectedNodeIndex(index, false);
         studioState.flow.nodes[index][field] = event.target.value;
+        renderFlowGuidance();
+        renderWorkflowOverview();
+        renderPreviewPanel();
         renderDraftJson();
       });
 
@@ -1149,33 +2040,59 @@
         renderDraftJson();
       });
 
-      flowList.addEventListener('click', (event) => {
+      flowList.addEventListener('focusin', (event) => {
         const card = event.target.closest('.studio-editor-node');
-        if (card) {
-          setSelectedNodeIndex(Number(card.dataset.index));
+        if (!card) {
+          return;
         }
 
+        const index = Number(card.dataset.index);
+        if (!Number.isInteger(index) || index === getSelectedNodeIndex()) {
+          return;
+        }
+
+        setSelectedNodeIndex(index, false);
+      });
+
+      flowList.addEventListener('click', (event) => {
         const actionButton = event.target.closest('[data-action]');
-        if (!actionButton) {
+        if (actionButton) {
+          const actionCard = actionButton.closest('.studio-editor-node');
+          const index = Number(actionCard.dataset.index);
+          if (actionButton.dataset.action === 'apply-candidate') {
+            applyInspectorCandidate(Number(actionButton.dataset.candidateIndex));
+            return;
+          }
+          if (actionButton.dataset.action === 'remove-node' && studioState.flow.nodes.length > 1) {
+            const nodeTitle = studioState.flow.nodes[index] && studioState.flow.nodes[index].title
+              ? '"' + studioState.flow.nodes[index].title + '"'
+              : 'this node';
+            if (!window.confirm('Remove ' + nodeTitle + ' from the current flow?')) {
+              return;
+            }
+            studioState.flow.nodes.splice(index, 1);
+            if (studioState.inspector.selected_node_index >= studioState.flow.nodes.length) {
+              studioState.inspector.selected_node_index = studioState.flow.nodes.length - 1;
+            }
+            pushEvent('flow.node_removed', 'Flow node removed', 'Studio removed a node from the current blueprint.', 'warning');
+            renderFlowEditor();
+            renderInspectorPanel();
+            renderDraftJson();
+          }
           return;
         }
 
-        const actionCard = actionButton.closest('.studio-editor-node');
-        const index = Number(actionCard.dataset.index);
-        if (actionButton.dataset.action === 'apply-candidate') {
-          applyInspectorCandidate(Number(actionButton.dataset.candidateIndex));
+        const card = event.target.closest('.studio-editor-node');
+        if (!card) {
           return;
         }
-        if (actionButton.dataset.action === 'remove-node' && studioState.flow.nodes.length > 1) {
-          studioState.flow.nodes.splice(index, 1);
-          if (studioState.inspector.selected_node_index >= studioState.flow.nodes.length) {
-            studioState.inspector.selected_node_index = studioState.flow.nodes.length - 1;
-          }
-          pushEvent('flow.node_removed', 'Flow node removed', 'Studio removed a node from the current blueprint.', 'warning');
-          renderFlowEditor();
-          renderInspectorPanel();
-          renderDraftJson();
+
+        const interactiveSelector = 'input, select, textarea, button, a, label';
+        if (event.target.closest(interactiveSelector)) {
+          return;
         }
+
+        setSelectedNodeIndex(Number(card.dataset.index));
       });
 
       inspectorCandidates.addEventListener('click', (event) => {
@@ -1194,7 +2111,7 @@
         const payload = event.data.payload || {};
         if (payload.ready) {
           studioState.inspector.status = 'armed';
-          studioState.inspector.source_note = 'Inspector snapshot is ready. Click any element in the frame to generate selector candidates.';
+          studioState.inspector.source_note = 'Page snapshot is ready. Click any element in the frame to generate selector candidates.';
           renderInspectorPanel();
           renderDraftJson();
           return;
@@ -1222,28 +2139,105 @@
         try {
           await primePreviewCache(true);
           if (cachedPreviewMethods.has(studioState.selected_method)) {
-            setFeedback('Preview cache primed successfully.', 'success');
+            setFeedback('Preview cache warmed successfully.', 'success');
           }
         } catch (error) {
           setFeedback(error.message, 'danger');
         } finally {
           setButtonBusy(primePreviewButton, false);
+          renderPreviewPanel();
         }
       });
 
       runPreviewButton.addEventListener('click', runPreview);
       saveTaskButton.addEventListener('click', saveTask);
-      loadInspectorButton.addEventListener('click', () => loadInspector(true));
-      runCopilotButton.addEventListener('click', loadCopilotSuggestion);
+      loadInspectorButton.addEventListener('click', () => {
+        helperPanelPreference.inspector = true;
+        renderHelperPanels();
+        loadInspector(true);
+      });
+      runCopilotButton.addEventListener('click', () => {
+        helperPanelPreference.copilot = true;
+        renderHelperPanels();
+        loadCopilotSuggestion();
+      });
       applyCopilotButton.addEventListener('click', applyCopilotSuggestion);
-      refreshMemoryButton.addEventListener('click', loadSelectorMemory);
+      if (refreshMemoryButton) {
+        refreshMemoryButton.addEventListener('click', loadSelectorMemory);
+      }
 
+      toggleCopilotPanelButton.addEventListener('click', () => {
+        setHelperPanelExpanded('copilot', !isHelperPanelExpanded('copilot', getHelperToolModel()));
+      });
+
+      toggleInspectorPanelButton.addEventListener('click', () => {
+        setHelperPanelExpanded('inspector', !isHelperPanelExpanded('inspector', getHelperToolModel()));
+      });
+
+      if (helperFocusStrip) {
+        helperFocusStrip.addEventListener('click', (event) => {
+          const helperButton = event.target.closest('[data-helper-key]');
+          if (helperButton) {
+            const toolKey = helperButton.dataset.helperKey;
+            setHelperPanelExpanded(toolKey, !isHelperPanelExpanded(toolKey, getHelperToolModel()));
+            return;
+          }
+
+          const target = event.target.closest('[data-target-id]');
+          if (!target) {
+            return;
+          }
+          scrollToStep(target.dataset.targetId);
+        });
+      }
+
+      if (naturalFlow) {
+        naturalFlow.addEventListener('click', (event) => {
+          const helperButton = event.target.closest('[data-helper-key]');
+          if (helperButton) {
+            setHelperPanelExpanded(helperButton.dataset.helperKey, true);
+            return;
+          }
+
+          const target = event.target.closest('[data-target-id]');
+          if (!target) {
+            return;
+          }
+          scrollToStep(target.dataset.targetId);
+        });
+      }
+
+      if (workflowMap) {
+        workflowMap.addEventListener('click', (event) => {
+          const target = event.target.closest('[data-target-id]');
+          if (!target) {
+            return;
+          }
+          scrollToStep(target.dataset.targetId);
+        });
+      }
+
+      if (nextStepCard) {
+        nextStepCard.addEventListener('click', (event) => {
+          const target = event.target.closest('[data-target-id]');
+          if (!target) {
+            return;
+          }
+          scrollToStep(target.dataset.targetId);
+        });
+      }
+
+      ensurePreviewMetadata();
       renderMethodDetail();
       renderPreviewPanel();
       renderFlowEditor();
       renderInspectorPanel();
       renderCopilotPanel();
       renderMemoryPanel();
+      renderFlowGuidance();
+      renderPreviewChecklist();
+      renderActionAvailability();
+      renderHelperPanels();
       renderEventLedger();
       renderDraftJson();
     </script>

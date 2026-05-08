@@ -1,4 +1,7 @@
+import re
 from typing import Any, Dict
+from urllib.parse import urljoin
+from urllib.request import Request, urlopen
 
 from bs4 import BeautifulSoup
 
@@ -237,6 +240,12 @@ INSPECTOR_SCRIPT = r"""
 """
 
 
+STYLE_IMPORT_RE = re.compile(r'@import\s+(?:url\([^)]*\)|[^;]+);?', re.IGNORECASE)
+STYLE_URL_RE = re.compile(r'url\((?P<value>.*?)\)', re.IGNORECASE)
+MAX_STYLESHEET_LINKS = 8
+MAX_STYLESHEET_BYTES = 500_000
+
+
 def _remove_dangerous_attributes(soup: BeautifulSoup):
     for tag in soup.find_all(True):
         attributes = dict(tag.attrs)
@@ -246,62 +255,184 @@ def _remove_dangerous_attributes(soup: BeautifulSoup):
                 del tag.attrs[attr_name]
 
 
+def _normalize_resource_url(base_url: str, value: str) -> str:
+    normalized = str(value or '').strip()
+    if not normalized or normalized.startswith(('#', 'data:', 'javascript:', 'mailto:', 'tel:')):
+        return normalized
+    return urljoin(base_url, normalized)
+
+
+def _normalize_srcset(base_url: str, value: str) -> str:
+    normalized_candidates = []
+    for candidate in str(value or '').split(','):
+        chunk = candidate.strip()
+        if not chunk:
+            continue
+        parts = chunk.split()
+        resource_url = _normalize_resource_url(base_url, parts[0])
+        descriptor = ' '.join(parts[1:])
+        normalized_candidates.append(resource_url + (' ' + descriptor if descriptor else ''))
+    return ', '.join(normalized_candidates)
+
+
+def _rewrite_relative_resource_urls(soup: BeautifulSoup, base_url: str):
+    for tag in soup.find_all(True):
+        for attr_name in ('href', 'src', 'poster', 'action'):
+            if tag.has_attr(attr_name):
+                tag[attr_name] = _normalize_resource_url(base_url, tag.get(attr_name))
+        if tag.has_attr('srcset'):
+            tag['srcset'] = _normalize_srcset(base_url, tag.get('srcset'))
+
+
+def _sanitize_embedded_styles(soup: BeautifulSoup):
+    for style_tag in list(soup.find_all('style')):
+        stylesheet = style_tag.string if style_tag.string is not None else style_tag.get_text()
+        sanitized = STYLE_IMPORT_RE.sub('', str(stylesheet or ''))
+        if sanitized.strip():
+            style_tag.string = sanitized
+        else:
+            style_tag.decompose()
+
+
+def _is_stylesheet_link(tag: Any) -> bool:
+  rel_values = tag.get('rel') or []
+  if isinstance(rel_values, str):
+    rel_values = rel_values.split()
+  normalized = {str(value).strip().lower() for value in rel_values if str(value).strip()}
+  return 'stylesheet' in normalized and bool(tag.get('href'))
+
+
+def _fetch_stylesheet_text(stylesheet_url: str) -> str:
+  normalized_url = str(stylesheet_url or '').strip()
+  if not normalized_url.startswith(('http://', 'https://')):
+    return ''
+
+  request = Request(
+    normalized_url,
+    headers={
+      'User-Agent': 'Mozilla/5.0 (compatible; CrawlaStudioInspector/1.0)',
+      'Accept': 'text/css,*/*;q=0.1',
+    },
+  )
+  try:
+    with urlopen(request, timeout=5) as response:
+      payload = response.read(MAX_STYLESHEET_BYTES + 1)
+      if len(payload) > MAX_STYLESHEET_BYTES:
+        return ''
+      charset = response.headers.get_content_charset() or 'utf-8'
+  except Exception:
+    return ''
+
+  try:
+    return payload.decode(charset, errors='replace')
+  except LookupError:
+    return payload.decode('utf-8', errors='replace')
+
+
+def _rewrite_stylesheet_resource_urls(stylesheet: str, stylesheet_url: str) -> str:
+  def replace_url(match: re.Match[str]) -> str:
+    raw_value = (match.group('value') or '').strip()
+    quote = ''
+    if raw_value[:1] in {'\"', "'"} and raw_value[-1:] == raw_value[:1]:
+      quote = raw_value[:1]
+      raw_value = raw_value[1:-1].strip()
+
+    if not raw_value:
+      return 'url()'
+    if raw_value.lower().startswith('javascript:'):
+      return 'url()'
+
+    normalized = _normalize_resource_url(stylesheet_url, raw_value)
+    if not normalized:
+      return 'url()'
+    wrapper = quote or '"'
+    return f'url({wrapper}{normalized}{wrapper})'
+
+  return STYLE_URL_RE.sub(replace_url, stylesheet)
+
+
+def _sanitize_stylesheet_text(stylesheet: str, stylesheet_url: str) -> str:
+  sanitized = STYLE_IMPORT_RE.sub('', str(stylesheet or ''))
+  return _rewrite_stylesheet_resource_urls(sanitized, stylesheet_url)
+
+
+def _collect_linked_stylesheets(soup: BeautifulSoup, base_url: str):
+  collected_stylesheets = []
+  stylesheet_links = [tag for tag in soup.find_all('link') if _is_stylesheet_link(tag)]
+  for link_tag in stylesheet_links[:MAX_STYLESHEET_LINKS]:
+    stylesheet_url = _normalize_resource_url(base_url, link_tag.get('href'))
+    stylesheet_text = _fetch_stylesheet_text(stylesheet_url)
+    if not stylesheet_text:
+      continue
+
+    sanitized_stylesheet = _sanitize_stylesheet_text(stylesheet_text, stylesheet_url)
+    if sanitized_stylesheet.strip():
+      collected_stylesheets.append(sanitized_stylesheet)
+
+  return collected_stylesheets
+
+
 def build_inspector_document(url: str, html: str, note: str) -> str:
-    soup = BeautifulSoup(html or '<html><body></body></html>', 'html.parser')
+  soup = BeautifulSoup(html or '<html><body></body></html>', 'html.parser')
+  linked_stylesheets = _collect_linked_stylesheets(soup, url)
 
-    for tag in soup.find_all(['script', 'noscript', 'iframe', 'object', 'embed']):
-        tag.decompose()
+  for tag in soup.find_all(['script', 'noscript', 'iframe', 'object', 'embed', 'link']):
+    tag.decompose()
 
-    for tag in soup.find_all('meta'):
-        if str(tag.get('http-equiv', '')).lower() == 'refresh':
-            tag.decompose()
+  for tag in soup.find_all('meta'):
+    if str(tag.get('http-equiv', '')).lower() == 'refresh':
+      tag.decompose()
 
-    _remove_dangerous_attributes(soup)
+  _remove_dangerous_attributes(soup)
+  _sanitize_embedded_styles(soup)
+  _rewrite_relative_resource_urls(soup, url)
 
-    if soup.html is None:
-        html_tag = soup.new_tag('html')
-        html_tag.extend(soup.contents)
-        soup.clear()
-        soup.append(html_tag)
+  if soup.html is None:
+    html_tag = soup.new_tag('html')
+    html_tag.extend(soup.contents)
+    soup.clear()
+    soup.append(html_tag)
 
-    if soup.head is None:
-        soup.html.insert(0, soup.new_tag('head'))
-    if soup.body is None:
-        body_tag = soup.new_tag('body')
-        for child in list(soup.html.contents):
-            if child is soup.head:
-                continue
-            body_tag.append(child.extract())
-        soup.html.append(body_tag)
+  if soup.head is None:
+    soup.html.insert(0, soup.new_tag('head'))
+  if soup.body is None:
+    body_tag = soup.new_tag('body')
+    for child in list(soup.html.contents):
+      if child is soup.head:
+        continue
+      body_tag.append(child.extract())
+    soup.html.append(body_tag)
 
-    base_tag = soup.new_tag('base', href=url)
-    soup.head.insert(0, base_tag)
+  for stylesheet in linked_stylesheets:
+    external_style_tag = soup.new_tag('style')
+    external_style_tag.string = stylesheet
+    soup.head.append(external_style_tag)
 
-    style_tag = soup.new_tag('style')
-    style_tag.string = INSPECTOR_STYLE
-    soup.head.append(style_tag)
+  style_tag = soup.new_tag('style')
+  style_tag.string = INSPECTOR_STYLE
+  soup.head.append(style_tag)
 
-    banner = soup.new_tag('div')
-    banner['data-crawla-inspector-banner'] = 'true'
-    banner.append('Click any element to generate selector candidates for Studio.')
-    pill = soup.new_tag('span')
-    pill['data-crawla-inspector-pill'] = 'true'
-    pill.string = note
-    banner.append(pill)
-    soup.body.insert(0, banner)
+  banner = soup.new_tag('div')
+  banner['data-crawla-inspector-banner'] = 'true'
+  banner.append('Click any element to generate selector candidates for Studio.')
+  pill = soup.new_tag('span')
+  pill['data-crawla-inspector-pill'] = 'true'
+  pill.string = note
+  banner.append(pill)
+  soup.body.insert(0, banner)
 
-    script_tag = soup.new_tag('script')
-    script_tag.string = INSPECTOR_SCRIPT
-    soup.body.append(script_tag)
-    return str(soup)
+  script_tag = soup.new_tag('script')
+  script_tag.string = INSPECTOR_SCRIPT
+  soup.body.append(script_tag)
+  return str(soup)
 
 
 def build_inspector_response(preview_id: str, selected_method: str, html: str, url: str) -> Dict[str, Any]:
-    source_mode = 'cached_html' if selected_method in {'py_requests', 'py_llm'} else 'http_snapshot'
-    note = 'Cached HTML preview' if source_mode == 'cached_html' else 'HTTP snapshot for browser runtime'
-    return {
-        'preview_id': preview_id,
-        'source_mode': source_mode,
-        'note': note,
-        'html': build_inspector_document(url, html, note),
-    }
+  source_mode = 'cached_html' if selected_method in {'py_requests', 'py_llm'} else 'browser_snapshot'
+  note = 'Cached HTML preview' if source_mode == 'cached_html' else 'Browser-rendered DOM snapshot'
+  return {
+    'preview_id': preview_id,
+    'source_mode': source_mode,
+    'note': note,
+    'html': build_inspector_document(url, html, note),
+  }

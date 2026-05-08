@@ -85,6 +85,27 @@ class MainModuleTests(unittest.TestCase):
             upsert=True,
         )
 
+    def test_get_inspector_source_uses_selenium_dom_and_closes_driver(self):
+        driver = MagicMock()
+
+        with patch.object(self.main, 'get_page_selenium', return_value=('<html>browser</html>', driver)):
+            content = self.main.get_inspector_source('https://example.com', 'py_selenium')
+
+        self.assertEqual(content, '<html>browser</html>')
+        driver.quit.assert_called_once_with()
+
+    def test_get_inspector_source_returns_none_when_selenium_driver_is_unavailable(self):
+        with patch.object(self.main, 'get_page_selenium', return_value=('<html>browser</html>', None)):
+            content = self.main.get_inspector_source('https://example.com', 'py_selenium')
+
+        self.assertIsNone(content)
+
+    def test_get_inspector_source_uses_playwright_dom(self):
+        with patch.object(self.main, 'get_page_playwright', return_value='<html>playwright</html>'):
+            content = self.main.get_inspector_source('https://example.com', 'py_playwright')
+
+        self.assertEqual(content, '<html>playwright</html>')
+
     def test_cache_preview_content_upserts_latest_html(self):
         response = types.SimpleNamespace(text='<html>fresh</html>')
 

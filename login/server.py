@@ -98,6 +98,8 @@ errors = 0
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DOCKER_ROOT = Path('/work')
+CACHED_INSPECTOR_METHODS = {'py_requests', 'py_llm'}
+BROWSER_INSPECTOR_METHODS = {'py_selenium', 'py_playwright'}
 
 
 # Connection to mongodb
@@ -349,6 +351,13 @@ def cache_preview(preview_payload):
     return subprocess.run(
         [get_python_command(), str(get_script_path('main.py')), '--temphtml', preview_payload],
         check=True,
+    )
+
+
+def fetch_live_snapshot_html(preview_payload):
+    return subprocess.check_output(
+        [get_python_command(), str(get_script_path('main.py')), '--snapshothtml', preview_payload],
+        universal_newlines=True,
     )
 
 
@@ -701,15 +710,21 @@ def studio_inspector():
 
     try:
         user_id = get_current_user_id()
-        cached_html = None if force_refresh else fetch_cached_preview_html(preview_id, user_id=user_id)
-        if not cached_html:
-            cache_preview(build_preview_cache_payload(preview_id, target_url, selected_method, user_id))
-            cached_html = fetch_cached_preview_html(preview_id, user_id=user_id)
+        snapshot_html = None
+        if selected_method in BROWSER_INSPECTOR_METHODS:
+            snapshot_html = fetch_live_snapshot_html(
+                build_preview_cache_payload(preview_id, target_url, selected_method, user_id)
+            )
+        else:
+            snapshot_html = None if force_refresh else fetch_cached_preview_html(preview_id, user_id=user_id)
+            if not snapshot_html:
+                cache_preview(build_preview_cache_payload(preview_id, target_url, selected_method, user_id))
+                snapshot_html = fetch_cached_preview_html(preview_id, user_id=user_id)
 
-        if not cached_html:
+        if not snapshot_html:
             return jsonify(message='Inspector snapshot is unavailable'), 404
 
-        return jsonify(build_inspector_response(preview_id, selected_method, cached_html, target_url)), 200
+        return jsonify(build_inspector_response(preview_id, selected_method, snapshot_html, target_url)), 200
     except subprocess.CalledProcessError:
         return jsonify(message='Failed to build inspector snapshot'), 500
 
