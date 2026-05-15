@@ -1,16 +1,8 @@
-import sys, json, os
+import sys
 from login.lib.mongo import mongoHelper
 import smtplib
 from email.mime.text import MIMEText
-from login.lib.cryptograpy import Crypto
-
-try:
-    with open("login/setting/config.json") as json_file:
-        config = json.load(json_file)
-except (FileNotFoundError, json.JSONDecodeError):
-    config = {}
-
-crypto = Crypto()
+from login.lib.runtime_config import get_int_setting, get_secret_setting, get_setting
 
 # Connection to mongodb
 db = mongoHelper.mongo_conn()
@@ -36,8 +28,15 @@ else:
     exit('bad command')
 
 
-if not config.get('mail_host'):
-    print("Email not configured (mail_host missing in config.json). Skipping.")
+mail_host = get_setting('CRAWLA_MAIL_HOST', config_path='mail_host')
+mail_port = get_int_setting('CRAWLA_MAIL_PORT', config_path='mail_port', default=465)
+mail_sender = get_setting('CRAWLA_MAIL_SENDER', config_path='mail_sender')
+mail_user = get_setting('CRAWLA_MAIL_USER', config_path='mail_user')
+mail_password = get_secret_setting('CRAWLA_MAIL_PASSWORD', config_path='mail_pw', decrypt_legacy=True)
+host_url = get_setting('CRAWLA_HOST_URL', config_path='host_url')
+
+if not mail_host:
+    print("Email not configured (mail_host missing). Set CRAWLA_MAIL_HOST or keep the legacy config.json fallback.")
     sys.exit(0)
 
 try:
@@ -49,18 +48,23 @@ except FileNotFoundError:
 
 
 for item in records:
-    dw_url = 'https://' + config['host_url'] + '/dw_csv/' + item['task_id']
+    if not host_url:
+        print("Email not configured (host_url missing). Set CRAWLA_HOST_URL or keep the legacy config.json fallback.")
+        sys.exit(0)
+    if not all((mail_sender, mail_user, mail_password)):
+        print("Email not configured (sender, user, or password missing). Set CRAWLA_MAIL_* env vars or the legacy config.json fallback.")
+        sys.exit(0)
+
+    dw_url = 'https://' + host_url + '/dw_csv/' + item['task_id']
     template = ori_template
     template = template.replace("{{name}}", item['noti_email'].split('@')[0])
     template = template.replace("{{download_url}}", dw_url)
-    sender = config['mail_sender']
+    sender = mail_sender
     receivers = item['noti_email']
-    mail_pw = bytes(config["mail_pw"], encoding='utf-8')
-    mail_pw = crypto.decrypt_message(mail_pw)
     try:
-        with smtplib.SMTP_SSL(host=config['mail_host'], port=config['mail_port']) as smtpObj:
+        with smtplib.SMTP_SSL(host=mail_host, port=mail_port) as smtpObj:
             smtpObj.login(
-                user=config["mail_user"], password=mail_pw)
+                user=mail_user, password=mail_password)
             template = MIMEText(template, 'html')
             template['Subject'] = 'New Task is added.'
             template['From'] = sender

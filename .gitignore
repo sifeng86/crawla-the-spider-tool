@@ -1,4 +1,6 @@
 *.env
+.env.production
+.env.staging
 *.key
 *.pyc
 *.csv

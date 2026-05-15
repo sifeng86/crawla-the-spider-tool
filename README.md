@@ -14,6 +14,7 @@ If you are starting from scratch, read these guides in this order:
 
 * [docs/OPERATING_GUIDE.md](docs/OPERATING_GUIDE.md) - end-to-end local setup, screen-by-screen usage, extraction methods, preview flow, Studio flow, scheduling, and troubleshooting.
 * [docs/AUTH0_SETUP.md](docs/AUTH0_SETUP.md) - step-by-step Auth0 setup for staging or production.
+* [docs/PRODUCTION_CHECKLIST.md](docs/PRODUCTION_CHECKLIST.md) - production env template, Docker Compose launch flow, and final verification checklist.
 
 ## What Crawla Is Good At
 
@@ -108,7 +109,9 @@ PowerShell:
 Copy-Item login/.env_example login/.env
 ```
 
-**Step 3 - Optional LLM settings**
+If you want LLM features locally, set `GOOGLE_API_KEY=your-key` in `login/.env`.
+
+**Step 3 - Optional LLM defaults**
 
 WSL / macOS / Linux:
 ```bash
@@ -120,7 +123,10 @@ PowerShell:
 Copy-Item login/setting/config_example.json login/setting/config.json
 ```
 
-Then add your Gemini API key under `llm.gemini.api_key`.
+Use `login/setting/config.json` only for non-sensitive fallback defaults such as model, temperature, or token limits.
+Keep Gemini secrets in `login/.env` for local Docker or `.env.production` / `GOOGLE_API_KEY_FILE` for production.
+
+If `login/setting/config.json` still contains `llm.gemini.api_key`, move that value to `GOOGLE_API_KEY` and clear the JSON field.
 
 For lower-cost LLM usage, prefer settings like:
 ```json
@@ -165,7 +171,7 @@ For a full walkthrough of each screen, see [docs/OPERATING_GUIDE.md](docs/OPERAT
 
 ### Staging / Production Mode
 
-Set `APP_ENV=production` and provide the Auth0 settings in `login/.env`. Crawla will then redirect `/login` to Auth0, create a session from the returned user profile, and scope saved tasks by that user id.
+For Docker deployments, copy `.env.production.example` to `.env.production`, fill the Auth0 settings there, then launch with `docker compose --env-file .env.production -f docker-compose.production.yml up -d --build`. Crawla will then redirect `/login` to Auth0, create a session from the returned user profile, and scope saved tasks by that user id.
 
 Each authenticated user sees only their own tasks, previews, and Studio saves.
 
@@ -257,10 +263,11 @@ CLI options:
 
 ### Auth0 For Production
 
-Set `APP_ENV=production` in `login/.env` and configure Auth0.
+For Docker production, copy `.env.production.example` to `.env.production` and configure Auth0 there.
 
 ```env
 APP_ENV=production
+SECRET_KEY=replace-with-a-long-random-secret
 AUTH0_CLIENT_ID=your_client_id
 AUTH0_DOMAIN=your-tenant.us.auth0.com
 AUTH0_CLIENT_SECRET=your_secret
@@ -272,9 +279,13 @@ Use a Regular Web Application in Auth0. The callback URL must exactly match `AUT
 
 For the full checklist, including verification steps, see [docs/AUTH0_SETUP.md](docs/AUTH0_SETUP.md).
 
+Production Docker now ships with a minimal Gunicorn profile through `gunicorn.conf.py` and `.env.production.example`, so you do not need to assemble a custom WSGI setup from scratch.
+
 ### MongoDB Atlas
 
-To use Atlas instead of the bundled MongoDB, update `login/setting/config.json`:
+The recommended production path is now `CRAWLA_MONGO_URI` in `.env.production`.
+
+Legacy `config.json` Atlas settings still work:
 
 ```json
 {
@@ -286,12 +297,14 @@ To use Atlas instead of the bundled MongoDB, update `login/setting/config.json`:
 }
 ```
 
-Atlas passwords must be encrypted. Inside the Docker container:
+If you keep using `config.json`, legacy Atlas passwords must still be encrypted. Inside the Docker container:
 ```bash
 docker exec -it crawla_web bash
 python key_generator.py
 python encrypt_token.py
 ```
+
+For simpler production secrets, prefer environment variables or `*_FILE` secrets instead of encrypted values inside `config.json`. At this point, `config.json` should be treated as a legacy fallback for non-sensitive defaults only.
 
 ## Architecture
 

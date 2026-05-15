@@ -1,20 +1,10 @@
-"""
-MongoDB connection helper with connection pooling.
-"""
-import json
+"""MongoDB connection helper with connection pooling."""
 from typing import Optional
+
 from pymongo import MongoClient
 from pymongo.database import Database
-from .cryptograpy import Crypto
 
-# Load configuration
-try:
-    with open("login/setting/config.json") as json_file:
-        config = json.load(json_file)
-except:
-    config = {}
-
-crypto = Crypto()
+from .runtime_config import get_secret_setting, get_setting, require_settings
 
 # Singleton client instance for connection pooling
 _client: Optional[MongoClient] = None
@@ -37,27 +27,45 @@ class mongoHelper:
         if _db is not None:
             return _db
 
-        # Handle missing config or local mode
         import os
+
         app_env = os.environ.get("APP_ENV", "local")
-        mongo_mode = "local"
-        try:
-            mongo_mode = config.get("mongo_mode", "local")
-        except:
-            pass
-        
-        if app_env != 'local' and mongo_mode == "atlas":
-            # MongoDB Atlas connection
-            atlas_pw = bytes(config["atlas_pw"], encoding='utf-8')
-            atlas_pw = crypto.decrypt_message(atlas_pw)
-            
-            conn_str = "mongodb+srv://{user}:{pw}@{cluster}/{db}?retryWrites=true&w=majority".format(
-                user=config["atlas_user"],
-                pw=atlas_pw,
-                cluster=config["atlas_host"],
-                db=config["atlas_db"],
+        mongo_uri = get_secret_setting('CRAWLA_MONGO_URI')
+        mongo_mode = str(get_setting('CRAWLA_MONGO_MODE', config_path='mongo_mode', default='local')).lower()
+
+        if mongo_uri:
+            default_db = str(get_setting('CRAWLA_MONGO_DB', config_path='mongo_db', default='crawla'))
+            _client = MongoClient(
+                mongo_uri,
+                maxPoolSize=10,
+                minPoolSize=2,
+                maxIdleTimeMS=30000,
+                connectTimeoutMS=10000,
+                serverSelectionTimeoutMS=10000,
             )
-            
+            _db = _client.get_default_database(default=default_db)
+        elif app_env != 'local' and mongo_mode == 'atlas':
+            atlas_host = get_setting('CRAWLA_ATLAS_HOST', config_path='atlas_host')
+            atlas_db = get_setting('CRAWLA_ATLAS_DB', config_path='atlas_db')
+            atlas_user = get_setting('CRAWLA_ATLAS_USER', config_path='atlas_user')
+            atlas_pw = get_secret_setting('CRAWLA_ATLAS_PASSWORD', config_path='atlas_pw', decrypt_legacy=True)
+            require_settings(
+                (
+                    ('CRAWLA_ATLAS_HOST', atlas_host),
+                    ('CRAWLA_ATLAS_DB', atlas_db),
+                    ('CRAWLA_ATLAS_USER', atlas_user),
+                    ('CRAWLA_ATLAS_PASSWORD', atlas_pw),
+                ),
+                'Atlas configuration is incomplete',
+            )
+
+            conn_str = "mongodb+srv://{user}:{pw}@{cluster}/{db}?retryWrites=true&w=majority".format(
+                user=atlas_user,
+                pw=atlas_pw,
+                cluster=atlas_host,
+                db=atlas_db,
+            )
+
             _client = MongoClient(
                 conn_str,
                 maxPoolSize=10,
@@ -66,9 +74,9 @@ class mongoHelper:
                 connectTimeoutMS=10000,
                 serverSelectionTimeoutMS=10000,
             )
-            _db = _client[config["atlas_db"]]
+            _db = _client[str(atlas_db)]
         else:
-            # Local MongoDB connection
+            mongo_db = str(get_setting('CRAWLA_MONGO_DB', config_path='mongo_db', default='crawla'))
             _client = MongoClient(
                 'mongo',
                 27017,
@@ -76,10 +84,7 @@ class mongoHelper:
                 minPoolSize=2,
                 maxIdleTimeMS=30000,
             )
-            try:
-                _db = _client[config.get("mongo_db", "crawla")]
-            except:
-                _db = _client["crawla"]
+            _db = _client[mongo_db]
         
         return _db
     

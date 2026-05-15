@@ -100,11 +100,18 @@ body {
 
 .crawla-mark {
   --mark-size: 72px;
-  animation: crawla-mark-glow 4.6s ease-in-out infinite;
-  background: linear-gradient(145deg, rgba(88, 166, 255, 0.16), rgba(46, 160, 67, 0.08));
-  border: 1px solid rgba(88, 166, 255, 0.24);
-  border-radius: 22px;
-  box-shadow: 0 0 28px rgba(68, 199, 244, 0.16), inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+  animation: crawla-mark-glow 6.6s ease-in-out infinite;
+  background:
+    radial-gradient(circle at 18% 16%, rgba(255, 189, 96, 0.2), transparent 22%),
+    radial-gradient(circle at 84% 82%, rgba(68, 199, 244, 0.18), transparent 26%),
+    linear-gradient(155deg, #06111a 0%, #0d1a26 48%, #152738 100%);
+  border: 1px solid rgba(140, 214, 255, 0.16);
+  border-radius: 24px;
+  box-shadow:
+    0 18px 42px rgba(2, 8, 16, 0.52),
+    0 0 32px rgba(68, 199, 244, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.02);
   display: block;
   height: var(--mark-size);
   overflow: hidden;
@@ -113,21 +120,29 @@ body {
 }
 
 .crawla-mark::before {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(150deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.015)),
+    radial-gradient(circle at 50% 50%, rgba(255, 190, 106, 0.16), transparent 24%),
+    radial-gradient(circle at 50% 50%, transparent 0 34%, rgba(95, 182, 255, 0.24) 34% 37%, transparent 38% 100%);
+  border: 1px solid rgba(255, 255, 255, 0.04);
   border-radius: 18px;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.02),
+    inset 0 -8px 18px rgba(4, 10, 18, 0.28);
   content: '';
-  inset: 10%;
+  inset: 12%;
   position: absolute;
+  transform: rotate(8deg);
 }
 
 .crawla-mark::after {
   background:
-    radial-gradient(circle at 24% 24%, rgba(255, 255, 255, 0.1), transparent 20%),
-    linear-gradient(135deg, transparent 0 45%, rgba(88, 166, 255, 0.15) 45% 56%, transparent 56% 100%);
+    linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 207, 130, 0.72), rgba(255, 255, 255, 0));
   content: '';
-  inset: 0;
+  inset: 16% 12% 16% 28%;
+  opacity: 0.88;
   position: absolute;
+  transform: rotate(-28deg);
 }
 
 .crawla-mark-sm {
@@ -136,53 +151,57 @@ body {
 
 .crawla-mark-lg {
   --mark-size: 88px;
-  border-radius: 26px;
+  border-radius: 28px;
 }
 
 .crawla-mark-core,
 .crawla-mark-node {
-  border-radius: 50%;
+  border-radius: 999px;
   position: absolute;
   z-index: 2;
 }
 
 .crawla-mark-core {
-  background: linear-gradient(180deg, #f0f6fc, #7ee787);
-  box-shadow: 0 0 16px rgba(126, 231, 135, 0.35);
-  height: 18%;
-  left: 41%;
-  top: 41%;
-  width: 18%;
+  background: linear-gradient(145deg, #fff2cd 0%, #ffb04f 42%, #44c7f4 100%);
+  box-shadow:
+    0 0 24px rgba(255, 176, 79, 0.28),
+    0 0 16px rgba(68, 199, 244, 0.24);
+  height: 24%;
+  left: 38%;
+  top: 37%;
+  transform: rotate(45deg);
+  width: 24%;
 }
 
 .crawla-mark-node {
-  box-shadow: 0 0 12px rgba(88, 166, 255, 0.25);
-  height: 14%;
-  width: 14%;
+  box-shadow: 0 0 16px rgba(88, 166, 255, 0.18);
+  height: 11%;
+  width: 11%;
 }
 
 .crawla-mark-node-a {
-  background: #58a6ff;
-  left: 70%;
-  top: 15%;
+  background: linear-gradient(180deg, #ffd6a3, #ff9f43);
+  left: 71%;
+  top: 18%;
 }
 
 .crawla-mark-node-b {
-  background: #44c7f4;
-  left: 15%;
-  top: 58%;
+  background: linear-gradient(180deg, #bde7ff, #58a6ff);
+  left: 16%;
+  top: 44%;
 }
 
 .crawla-mark-node-c {
-  background: #2ea043;
-  left: 70%;
-  top: 72%;
+  background: linear-gradient(180deg, #aaf7ef, #32c8b4);
+  left: 69%;
+  top: 71%;
 }
 
 .crawla-mark-link {
-  background: linear-gradient(90deg, rgba(88, 166, 255, 0.25), rgba(240, 246, 252, 0.7));
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.04), rgba(143, 220, 255, 0.94), rgba(255, 188, 112, 0.32));
   border-radius: 999px;
-  height: 2px;
+  box-shadow: 0 0 12px rgba(88, 166, 255, 0.18);
+  height: 3px;
   position: absolute;
   transform-origin: left center;
   z-index: 1;
@@ -190,23 +209,23 @@ body {
 
 .crawla-mark-link-a {
   left: 50%;
-  top: 36%;
-  transform: rotate(-32deg);
-  width: 28%;
+  top: 41%;
+  transform: rotate(-33deg);
+  width: 25%;
 }
 
 .crawla-mark-link-b {
-  left: 26%;
-  top: 59%;
-  transform: rotate(29deg);
-  width: 27%;
+  left: 27%;
+  top: 51%;
+  transform: rotate(-6deg);
+  width: 23%;
 }
 
 .crawla-mark-link-c {
   left: 50%;
-  top: 64%;
-  transform: rotate(33deg);
-  width: 26%;
+  top: 59%;
+  transform: rotate(36deg);
+  width: 21%;
 }
 
 .btn {
@@ -288,12 +307,20 @@ label {
 
 @keyframes crawla-mark-glow {
   0%, 100% {
-    box-shadow: 0 0 28px rgba(68, 199, 244, 0.16), inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+    box-shadow:
+      0 18px 42px rgba(2, 8, 16, 0.52),
+      0 0 32px rgba(68, 199, 244, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.02);
     transform: translateY(0);
   }
   50% {
-    box-shadow: 0 0 34px rgba(88, 166, 255, 0.24), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
-    transform: translateY(-1px);
+    box-shadow:
+      0 22px 46px rgba(2, 8, 16, 0.58),
+      0 0 40px rgba(88, 166, 255, 0.16),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+    transform: translateY(-1px) scale(1.012);
   }
 }
 

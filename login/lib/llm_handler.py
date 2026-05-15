@@ -10,6 +10,8 @@ from typing import Optional, Dict, Any
 from threading import Lock
 from bs4 import BeautifulSoup
 
+from .runtime_config import get_float_setting, get_int_setting, get_secret_setting, get_setting, load_legacy_config
+
 
 # In-memory LLM response cache
 _llm_cache: Dict[str, str] = {}
@@ -154,15 +156,10 @@ def clean_webpage_content(content: str) -> str:
 
 def load_config() -> Dict[str, Any]:
     """
-    Loads configuration from the config.json file.
-    Returns empty dict if file is missing (LLM will rely on env var fallback).
+    Loads legacy fallback configuration from config.json.
+    Returns empty dict if file is missing; env vars remain the preferred source.
     """
-    config_path = os.path.join(os.path.dirname(__file__), "../setting/config.json")
-    try:
-        with open(config_path, "r") as config_file:
-            return json.load(config_file)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {}
+    return load_legacy_config()
 
 
 def get_cache_key(prompt: str, content: str) -> str:
@@ -241,15 +238,20 @@ def get_gemini_response(prompt: str, webpage_content: Optional[str] = None) -> s
         
         print("[LLM Cache] Miss - calling Gemini API")
         
-        # Load configuration
         config = load_config()
         llm_config = config.get("llm", {}).get("gemini", {})
 
-        # API key: config.json takes precedence, fallback to env var
-        api_key = llm_config.get("api_key") or os.getenv("GOOGLE_API_KEY")
+        api_key = get_secret_setting('GOOGLE_API_KEY', config_path=('llm', 'gemini', 'api_key'))
         if not api_key:
-            raise ValueError("Google API key not configured. Set GOOGLE_API_KEY in .env or llm.gemini.api_key in config.json")
+            raise ValueError("Google API key not configured. Set GOOGLE_API_KEY or GOOGLE_API_KEY_FILE. llm.gemini.api_key in config.json is legacy fallback only.")
 
+        llm_config = {
+            **llm_config,
+            'model': get_setting('CRAWLA_GEMINI_MODEL', config_path=('llm', 'gemini', 'model'), default='gemini-2.0-flash'),
+            'temperature': get_float_setting('CRAWLA_GEMINI_TEMPERATURE', config_path=('llm', 'gemini', 'temperature'), default=0.1),
+            'max_output_tokens': get_int_setting('CRAWLA_GEMINI_MAX_OUTPUT_TOKENS', config_path=('llm', 'gemini', 'max_output_tokens'), default=2048),
+            'thinking_level': get_setting('CRAWLA_GEMINI_THINKING_LEVEL', config_path=('llm', 'gemini', 'thinking_level'), default=DEFAULT_THINKING_LEVEL),
+        }
         model = llm_config.get("model", "gemini-2.0-flash")
         
         # Clean and prepare content

@@ -27,10 +27,13 @@ Optional config files:
 
 ```bash
 cp login/.env_example login/.env
-cp login/setting/config_example.json login/setting/config.json
 ```
 
 On PowerShell, use `Copy-Item` instead of `cp`.
+
+If you want LLM features locally, set `GOOGLE_API_KEY` in `login/.env`.
+
+Only copy `login/setting/config_example.json` to `login/setting/config.json` if you want legacy fallback defaults such as Gemini model or token settings. Do not keep API keys in `config.json`.
 
 ## 2. Screen Map
 

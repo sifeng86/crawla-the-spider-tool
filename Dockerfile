@@ -56,4 +56,4 @@ RUN mkdir -p /work/login/downloads /work/login/key /work/login/setting \
 USER crawla
 
 # Start the application
-CMD bash startup.sh && flask run
+CMD ["bash", "startup.sh"]

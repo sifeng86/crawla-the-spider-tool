@@ -63,12 +63,12 @@ https://crawla.example.com
 
 If you have both staging and production, add both sets explicitly.
 
-## 4. Fill `login/.env`
+## 4. Fill `.env.production`
 
-Start from the example file:
+For Docker deployments, start from the production example file at the repository root:
 
 ```bash
-cp login/.env_example login/.env
+cp .env.production.example .env.production
 ```
 
 Then set:
@@ -91,17 +91,18 @@ Notes:
 * `SECRET_KEY` is required in production mode.
 * `AUTH0_AUDIENCE` is optional unless your Auth0 setup requires an API audience.
 * `AUTH0_CALLBACK_URL` and `AUTH0_LOGOUT_REDIRECT_URL` must exactly match the values configured in Auth0.
+* `login/.env` is still a fallback for direct non-Docker app runs, but Docker Compose production should use `.env.production` with `--env-file`.
 
 ## 5. Start Or Restart The Stack
 
 ```bash
-docker compose up -d --build
+docker compose --env-file .env.production -f docker-compose.production.yml up -d --build
 ```
 
 If the stack is already running and you only changed environment or templates:
 
 ```bash
-docker compose restart crawla_web
+docker compose --env-file .env.production -f docker-compose.production.yml restart crawla_web
 ```
 
 ## 6. Verify Login Flow

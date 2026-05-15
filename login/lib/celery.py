@@ -1,19 +1,9 @@
-"""
-Celery/Redis connection helper with connection pooling.
-"""
-import json
+"""Celery/Redis connection helper with connection pooling."""
 from typing import Optional
+
 from celery import Celery
-from .cryptograpy import Crypto
 
-# Load configuration
-try:
-    with open("login/setting/config.json") as json_file:
-        config = json.load(json_file)
-except:
-    config = {}
-
-crypto = Crypto()
+from .runtime_config import get_secret_setting, get_setting, require_settings
 
 # Singleton Celery app instance
 _app: Optional[Celery] = None
@@ -35,21 +25,27 @@ class celeryHelper:
         if _app is not None:
             return _app
         
-        # Configure Redis connection
         import os
-        app_env = os.environ.get("APP_ENV", "local")
-        redis_host_port = "local"
-        try:
-            redis_host_port = config.get("redis_host_port", "local")
-        except:
-            pass
 
-        if app_env == 'local' or redis_host_port == 'local':
+        app_env = os.environ.get("APP_ENV", "local")
+        redis_url = get_secret_setting('CRAWLA_REDIS_URL')
+        redis_host_port = str(get_setting('CRAWLA_REDIS_HOST_PORT', config_path='redis_host_port', default='local'))
+
+        if redis_url:
+            broker = redis_url
+            backend = redis_url
+        elif app_env == 'local' or redis_host_port == 'local':
             broker = 'redis://redis:6379/0'
             backend = 'redis://redis:6379/0'
         else:
-            redis_pw = bytes(config["redis_pw"], encoding='utf-8')
-            redis_pw = crypto.decrypt_message(redis_pw)
+            redis_pw = get_secret_setting('CRAWLA_REDIS_PASSWORD', config_path='redis_pw', decrypt_legacy=True)
+            require_settings(
+                (
+                    ('CRAWLA_REDIS_HOST_PORT', redis_host_port),
+                    ('CRAWLA_REDIS_PASSWORD', redis_pw),
+                ),
+                'Redis configuration is incomplete',
+            )
             conn_host_port = 'redis://:{pw}@{host_port}'.format(
                 pw=redis_pw,
                 host_port=redis_host_port

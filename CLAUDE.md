@@ -20,9 +20,9 @@ Selenium Chrome → JS rendering
 ## Commands
 ```bash
 # Build/run
-docker-compose build
-docker-compose up [-d]
-docker-compose down
+docker compose build
+docker compose up [-d]
+docker compose down
 
 # Encrypt secrets
 docker run -it -v ${PWD}:/work crawla_web:latest bash
@@ -38,8 +38,8 @@ docker exec crawla_web python sendmail.py --task TASKID
 ```
 
 ## Rules
-1.  All passwords in `login/setting/config.json` **MUST** be encrypted
-2.  Config files: `login/.env`, `login/setting/config.json`
+1.  Prefer environment variables or `*_FILE` secrets; treat `login/setting/config.json` as a legacy fallback for non-sensitive defaults.
+2.  If legacy secrets are still stored in `login/setting/config.json`, encrypted values remain required there.
 3.  No `exec()` for crawl steps, use `StepExecutor`
 4.  All requests use stealth headers + automatic rate limiting
 
