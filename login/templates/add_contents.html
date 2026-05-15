@@ -10,158 +10,236 @@
         integrity="sha384-B0vP5xmATw1+K9KRQjQERJvTumQW0nPEzvF6L/Z6nronJ3oUOFUFpCjEUQouq2+l" crossorigin="anonymous">
       <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.15.3/css/fontawesome.min.css"
         integrity="sha384-wESLQ85D6gbsF459vf1CiZ2+rr+CsxRY0RpiF1tLlQpDnAgg6rwdsUF1+Ics2bni" crossorigin="anonymous">
-      <style>
-        .bd-example {
-            position: relative;
-            padding: 1rem;
-            margin: 1rem -15px 0;
-            border: solid #f8f9fa;
-            border-width: .2rem 0 0;
-        }
-      </style>
-      </style>
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.15.3/css/solid.min.css"
+        crossorigin="anonymous">
+      <link href="/public/app.css" rel="stylesheet">
     
     </head>
-    <body>
-      <div style="position: absolute; top: 0; right: 0;"><a href="{{ url_for('logout') }}">logout</a></div>
-      <div><img style="margin: 30px 20px;" src="{{ url_for('static', filename='img/header-logo-small.png') }}"> </div>
-      <div class="p-3 rounded shadow-sm">
-        
-        <form name="contents" action="{{ url_for('contents') }}" method="post">
-          <div class="form-row">
-            <div class="form-group col-md-4">
-              <label for="task_name">Task Name:</label>
-              <input type="text" class="form-control" id="task_name" name="task_name" placeholder="eg: Momo product 1" required>
-              <input type="hidden" id="f_token" name="token" value="{{formtoken}}">
-            </div>
+    <body class="home">
+      <div style="position: absolute; top: 1rem; right: 1rem;">
+        <span class="text-muted mr-3">{{userinfo['name']}}</span>
+        <a href="{{ url_for('studio') }}" class="btn btn-sm btn-outline-info mr-2">Studio Beta</a>
+        <a href="{{ url_for('logout') }}" class="btn btn-sm btn-info">Logout</a>
+      </div>
+      <div class="crawla-page-brand">
+        <div class="crawla-brand-lockup compact">
+          <div class="crawla-mark" role="img" aria-label="Crawla brand mark">
+            <span class="crawla-mark-core"></span>
+            <span class="crawla-mark-node crawla-mark-node-a"></span>
+            <span class="crawla-mark-node crawla-mark-node-b"></span>
+            <span class="crawla-mark-node crawla-mark-node-c"></span>
+            <span class="crawla-mark-link crawla-mark-link-a"></span>
+            <span class="crawla-mark-link crawla-mark-link-b"></span>
+            <span class="crawla-mark-link crawla-mark-link-c"></span>
           </div>
-          <div class="form-row">
-            <div class="form-group col-md-4">
-              <label for="url">Notification Email:</label>
-              <input type="email" class="form-control" name="noti_email" id="noti_email" value="{{userinfo['email']}}" aria-describedby="emailHelp" required>
-              <small id="emailHelp" class="form-text text-muted">We'll never share your email with anyone else.</small>
-            </div>
+          <div class="crawla-brand-copy">
+            <p class="crawla-brand-eyebrow">Classic builder</p>
+            <h1 class="crawla-brand-title">Compose a Crawla task</h1>
+            <p class="crawla-brand-subtitle">Configure extraction steps, preview the result, and queue the task without leaving the existing builder.</p>
           </div>
-          <div class="form-row">
-            <div class="form-group col-md-4">
-              <label for="url">Url:</label>
-              <input type="url" class="form-control" name="url" id="url" aria-describedby="urlHelp"
-                placeholder="eg: https://www.momoshop.com.tw/" required>
-              <small id="emailHelp" class="form-text text-muted">Your target url.</small>
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group col-md-4">
-              <label>Method:</label>
-                <div class="form-check">
-                  <input class="form-check-input" type="radio" name="c_method" id="py_requests" value="py_requests" aria-describedby="reHelp" checked>
-                  <label class="form-check-label" for="py_requests">
-                    Request (<a href="https://www.crummy.com/software/BeautifulSoup/bs4/doc/" target="_blank">reference</a>)
-                  </label>
-                <small id="reHelp" class="form-text text-muted">[Fast] pure html parser, no javascript rendering in DOM (Static).</small>
-                </div>
-                <div class="form-check">
-                  <input class="form-check-input" type="radio" name="c_method" id="py_selenium" value="py_selenium"  aria-describedby="seHelp">
-                  <label class="form-check-label" for="py_selenium">
-                    Selenium (<a href="https://selenium-python.readthedocs.io/" target="_blank">reference</a>)
-                  </label>
-                  <small id="seHelp" class="form-text text-muted">[Slow] javascript behavior in the rendering (Dynamic).</small>
-                </div>
-                <div class="form-check">
-                  <input class="form-check-input" type="radio" name="c_method" id="py_llm" value="py_llm" aria-describedby="llmHelp">
-                  <label class="form-check-label" for="py_llm">
-                    LLM
-                  </label>
-                  <small id="llmHelp" class="form-text text-muted">Use Large Language Model to extract information</small>
-                </div>
-            </div>
-          </div>
-          <div id="default-row">
+        </div>
+      </div>
+      
+      <div class="container pb-5">
+        <div class="glass-panel mb-5">
+          <form name="contents" action="{{ url_for('contents') }}" method="post">
             <div class="form-row">
-              <div class="form-group col-md-3">
-                <label for="steps">Steps:</label>
-                <select id="steps" class="form-control steps" name="steps[]" required>
-                  <option selected value="">Choose...</option>
-                  <option value="select_one">BS4 - select one (use css)</option>
-                  <option value="select_all">BS4 - select all (use css)</option>
-                  <option value="find_element_by_id">BS4 - find one by id (no # required)</option>
-                  <option value="find_elements_by_id">BS4 - find all by id (no # required)</option>
-                  <option value="find_element_by_class">BS4 - find one by class (no . required)</option>
-                  <option value="find_elements_by_class">BS4 - find all by class (no . required)</option>
-                  <option value="ext_str_get_text">BS4 - get_text()</option>
-                </select>
-              </div>
-              <div class="form-group col-md-3">
-                <label for="args">Arguments:</label><small class="text-muted">eg: #price > li , (give - if no argument)</small>
-                <input type="text" name="args[]" class="form-control args" id="args" value="-" placeholder="give - if no argument" required>
-              </div>
-              <div class="form-group col-md-1">
-                <label for="more1" style="color: transparent;">More:</label>
-                <button type="button" class="form-control btn btn-info" id="more1">+</button>
+              <div class="form-group col-md-4">
+                <label for="task_name">Task Name:</label>
+                <input type="text" class="form-control" id="task_name" name="task_name" placeholder="eg: Momo product 1" required>
+                <input type="hidden" id="f_token" name="token" value="{{formtoken}}">
               </div>
             </div>
-          </div>
-          <div id="new-row"></div>
-          <button type="submit" id="save" class="btn btn-primary">Save</button>
-          <button type="button" id="preview" class="btn btn-success" disabled>Preview</button>
-          {% if error %}
-          <p class="msgs" style="color:rgb(243, 52, 19);"><strong>Error: </strong> {{ error }}
-            {% elif request.args.get('msg')=='success' %}
-          <p class="msgs" style="color:rgb(6, 167, 6);"><strong>Success:</strong>  Task is inserted!
-            {% elif request.args.get('msg')=='deleted' %}
-          <p class="msgs" style="color:rgb(6, 167, 6);"><strong>Success:</strong> Task is deleted!
-          {% endif %}
-          <p id="result" style="margin-top: 30px;"></p>
-        </form>
-      </div>
+            <div class="form-row">
+              <div class="form-group col-md-4">
+                <label for="noti_email">Notification Email:</label>
+                <input type="email" class="form-control" name="noti_email" id="noti_email" value="{{userinfo['email']}}" aria-describedby="emailHelp" required>
+                <small id="emailHelp" class="form-text text-muted">We'll never share your email with anyone else.</small>
+              </div>
+              <div class="form-group col-md-5 d-flex align-items-end">
+                <div class="form-check mb-2">
+                  <input type="checkbox" class="form-check-input" name="schedule_enabled" id="schedule_enabled" value="1" checked>
+                  <label class="form-check-label text-white" for="schedule_enabled">Include this task in scheduled batch runs</label>
+                  <small class="form-text text-muted">External cron jobs calling <code>main.py --all</code> will only execute enabled tasks.</small>
+                </div>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group col-md-8">
+                <label for="url">Url:</label>
+                <input type="url" class="form-control" name="url" id="url" aria-describedby="urlHelp"
+                  placeholder="eg: https://www.momoshop.com.tw/" required>
+                <small id="urlHelp" class="form-text text-muted">Your target url.</small>
+              </div>
+            </div>
+            <div class="form-row mt-3 mb-4">
+              <div class="col-12">
+                <label class="d-block">Extraction Method:</label>
+                <div class="btn-group btn-group-toggle" data-toggle="buttons">
+                  <label class="btn btn-outline-info active">
+                    <input type="radio" name="c_method" id="py_requests" value="py_requests" checked> ⚡ Requests (BS4)
+                  </label>
+                  <label class="btn btn-outline-info">
+                    <input type="radio" name="c_method" id="py_selenium" value="py_selenium"> 🌐 Selenium
+                  </label>
+                  <label class="btn btn-outline-info">
+                    <input type="radio" name="c_method" id="py_playwright" value="py_playwright"> 🎭 Playwright
+                  </label>
+                  <label class="btn btn-outline-info">
+                    <input type="radio" name="c_method" id="py_llm" value="py_llm"> 🧠 LLM
+                  </label>
+                </div>
+                <small class="form-text text-muted mt-2">LLM Self-Healing retries broken lookup steps for Requests, Selenium, and Playwright. The LLM method uses direct prompt/schema extraction and does not rely on selector healing.</small>
+              </div>
+            </div>
+            
+            <div class="glass-panel mb-4 p-4" style="background: rgba(0,0,0,0.2);">
+              <h5 class="text-white mb-3">Steps Configuration</h5>
+              <div id="default-row">
+                <div class="form-row align-items-end">
+                  <div class="form-group col-md-4">
+                    <label for="steps">Action:</label>
+                    <select id="steps" class="form-control steps" name="steps[]" required>
+                      <option selected value="">Choose...</option>
+                      <option value="select_one">BS4 - select one (use css)</option>
+                      <option value="select_all">BS4 - select all (use css)</option>
+                      <option value="find_element_by_id">BS4 - find one by id</option>
+                      <option value="find_elements_by_id">BS4 - find all by id</option>
+                      <option value="find_element_by_class">BS4 - find one by class</option>
+                      <option value="find_elements_by_class">BS4 - find all by class</option>
+                      <option value="ext_str_get_text">BS4 - get_text()</option>
+                    </select>
+                  </div>
+                  <div class="form-group col-md-7">
+                    <label for="args">Arguments:</label>
+                    <input type="text" name="args[]" class="form-control args" id="args" value="-" placeholder="give - if no argument" required>
+                  </div>
+                  <div class="form-group col-md-1">
+                    <button type="button" class="form-control btn btn-info" id="more1" title="Add Step"><i class="fas fa-plus"></i></button>
+                  </div>
+                </div>
+              </div>
+              <div id="new-row"></div>
+            </div>
 
-      <div style="margin: 30px 0 30px 0;">
-        <table class="table table-hover table-dark">
-          <thead class="thead-light" style="background-color: #CDF27E;">
-            <tr>
-              <th scope="col">#</th>
-              <th scope="col">Task Name</th>
-              <th scope="col">Url</th>
-              <th scope="col">Download</th>
-              <th scope="col"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {% if records %}
-              {% for i in records %}
-              <tr>
-                <th scope="row">{{loop.index}}</th>
-                <td>{{i.task_name}}</td>
-                <td><a href="{{i.url}}" target="_blank">{{i.url}}</a></td>
-                <td><a href="{{ url_for('dw_csv', tid=i.task_id) }}">file</a></td>
-                <td><a href="{{ url_for('del_contents', tid=i.task_id) }}"><img src="{{ url_for('static', filename='img/del.png') }}"></a></td>
-              </tr>
-              {% endfor %}
-            {% endif %}
-          </tbody>
-        </table>
+            <div class="d-flex align-items-center mt-4">
+              <button type="submit" id="save" class="btn btn-primary mr-3 px-4">Save Task</button>
+              <button type="button" id="preview" class="btn btn-info px-4" disabled>Live Preview</button>
+            </div>
+            
+            <div class="mt-3">
+              {% if error %}
+              <div class="alert alert-danger">{{ error }}</div>
+              {% elif request.args.get('msg')=='success' %}
+              <div class="alert alert-success">Task is inserted successfully!</div>
+              {% elif request.args.get('msg')=='queued' %}
+              <div class="alert alert-success">Task has been queued successfully.</div>
+              {% elif request.args.get('msg')=='queue_failed' %}
+              <div class="alert alert-warning">Task was found, but queue dispatch failed.</div>
+              {% elif request.args.get('msg')=='schedule_enabled' %}
+              <div class="alert alert-success">Task is enabled for scheduled batch runs.</div>
+              {% elif request.args.get('msg')=='schedule_paused' %}
+              <div class="alert alert-warning">Task is paused for scheduled batch runs.</div>
+              {% elif request.args.get('msg')=='deleted' %}
+              <div class="alert alert-success">Task is deleted successfully!</div>
+              {% elif request.args.get('error')=='Task_not_found.' %}
+              <div class="alert alert-danger">Task not found for the current user.</div>
+              {% endif %}
+            </div>
+            <div id="result" class="mt-4" style="min-height: 50px;"></div>
+          </form>
+        </div>
+
+        <div class="glass-panel">
+          <h4 class="text-white mb-4">Saved Tasks</h4>
+          <div class="table-responsive">
+            <table class="table table-hover table-dark">
+              <thead>
+                <tr>
+                  <th scope="col">#</th>
+                  <th scope="col">Task Name</th>
+                  <th scope="col">Url</th>
+                  <th scope="col">Schedule</th>
+                  <th scope="col">Data</th>
+                  <th scope="col">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% if records %}
+                  {% for i in records %}
+                  {% set schedule_enabled = i.schedule_enabled if i.schedule_enabled is defined else True %}
+                  {% set has_task_id = i.task_id is defined and i.task_id %}
+                  <tr>
+                    <th scope="row">{{loop.index}}</th>
+                    <td>{{i.task_name}}</td>
+                    <td><a href="{{i.url}}" target="_blank" class="text-info">{{i.url|truncate(40)}}</a></td>
+                    <td>
+                      {% if schedule_enabled %}
+                      <span class="badge badge-success">Enabled</span>
+                      {% else %}
+                      <span class="badge badge-secondary">Paused</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if has_task_id %}
+                      <a href="{{ url_for('dw_csv', tid=i.task_id) }}" class="btn btn-sm btn-outline-success"><i class="fas fa-download"></i> CSV</a>
+                      {% else %}
+                      <span class="badge badge-warning">Missing task id</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if has_task_id %}
+                      <div class="d-flex flex-wrap">
+                        <form action="{{ url_for('run_contents', tid=i.task_id) }}" method="post" class="mr-2 mb-2">
+                          <input type="hidden" name="token" value="{{formtoken}}">
+                          <button type="submit" class="btn btn-sm btn-outline-info"><i class="fas fa-play"></i> Run now</button>
+                        </form>
+                        <form action="{{ url_for('schedule_contents', tid=i.task_id) }}" method="post" class="mr-2 mb-2">
+                          <input type="hidden" name="token" value="{{formtoken}}">
+                          <input type="hidden" name="schedule_enabled" value="{{ '0' if schedule_enabled else '1' }}">
+                          <button type="submit" class="btn btn-sm btn-outline-warning">
+                            <i class="fas fa-clock"></i> {{ 'Pause schedule' if schedule_enabled else 'Enable schedule' }}
+                          </button>
+                        </form>
+                        <a href="{{ url_for('del_contents', tid=i.task_id) }}" class="btn btn-sm btn-outline-danger mb-2" onclick="return confirm('Are you sure?')"><i class="fas fa-trash"></i></a>
+                      </div>
+                      {% else %}
+                      <span class="text-muted">Legacy record requires migration before actions are available.</span>
+                      {% endif %}
+                    </td>
+                  </tr>
+                  {% endfor %}
+                {% else %}
+                  <tr>
+                    <td colspan="6" class="text-center text-muted">No tasks saved yet.</td>
+                  </tr>
+                {% endif %}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
-     
     </body>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"
-      integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/js/bootstrap.bundle.min.js"
         integrity="sha384-Piv4xVNRyMGpqkS2by6br4gNJ7DXjqk09RmUpJ8jgGtD7zP9yug3goQfGII0yAns"
         crossorigin="anonymous"></script>
     <script type="text/javascript">
+      var previewCacheRequest = null;
+
       // add row
       $('#more1').click(function () {
           var html = '';
-          html += '<div id="newRow" class="form-row">';
-          html += '<div class="form-group col-md-3">';
+          html += '<div id="newRow" class="form-row align-items-end mt-2">';
+          html += '<div class="form-group col-md-4">';
           html += '<select id="steps" class="form-control steps" name="steps[]" required>';
           html += '</select>';
           html += '</div>';
-          html += '<div class="form-group col-md-3">';
+          html += '<div class="form-group col-md-7">';
           html += '<input type="text" name="args[]" class="form-control args" id="args" value="-" placeholder="give - if no argument" required>';
           html += '</div>';
           html += '<div class="form-group col-md-1">';
-          html += '<button type="button" class="form-control btn btn-danger" id="rm1">remove</button>';
+          html += '<button type="button" class="form-control btn btn-danger" id="rm1" title="Remove Step"><i class="fas fa-trash"></i></button>';
           html += '</div>';
           html += '</div>';
 
@@ -195,15 +273,50 @@
             newhtml += '<option value="find_elements_by_id">selenium - find all by id (no # required)</option>';
             newhtml += '<option value="find_element_by_class">selenium - find one by class (no . required)</option>';
             newhtml += '<option value="find_elements_by_class">selenium - find all by class (no . required)</option>';
-            newhtml += '<option value="find_element_by_css_selector">selenium - find one(css_selector)</option>';
-            newhtml += '<option value="find_elements_by_css_selector">selenium - find all(css_selector)</option>';
+            newhtml += '<option value="find_element_by_css">selenium - find one(css_selector)</option>';
+            newhtml += '<option value="find_elements_by_css">selenium - find all(css_selector)</option>';
             newhtml += '<option value="click">selenium - click()</option>';
             newhtml += '<option value="ext_str_get_text">selenium - .text</option>';
             newhtml += '<option value="ext_str_get_attribute">selenium - get_attribute()</option>';
+          } else if (method == 'py_playwright') {
+            newhtml += '<option selected value="">Choose...</option>';
+            newhtml += '<option value="find_element_by_id">playwright - find one by id</option>';
+            newhtml += '<option value="find_elements_by_id">playwright - find all by id</option>';
+            newhtml += '<option value="find_element_by_class">playwright - find one by class</option>';
+            newhtml += '<option value="find_elements_by_class">playwright - find all by class</option>';
+            newhtml += '<option value="find_element_by_css">playwright - find one(css)</option>';
+            newhtml += '<option value="find_elements_by_css">playwright - find all(css)</option>';
+            newhtml += '<option value="find_element_by_xpath">playwright - find one(xpath)</option>';
+            newhtml += '<option value="click">playwright - click()</option>';
+            newhtml += '<option value="ext_str_get_text">playwright - text_content()</option>';
+            newhtml += '<option value="ext_str_get_attribute">playwright - get_attribute()</option>';
+            newhtml += '<option value="ext_str_get_href">playwright - get href</option>';
           } else if (method == 'py_llm') {
-            newhtml += '<option selected value="llm_prompt">LLM - Enter your prompt</option>';
+            newhtml += '<option selected value="llm_prompt">LLM - Enter your prompt / JSON schema</option>';
           }
           return newhtml;
+      }
+
+      function primePreviewCache() {
+          var url = $('#url').val();
+          if (!url || !url.includes("http", 0)) {
+            previewCacheRequest = null;
+            return null;
+          }
+
+          var params = {
+            "url": url,
+            "preview_id": $('#f_token').val(),
+            "c_method": $('input[name=c_method]:checked').val()
+          };
+
+          previewCacheRequest = $.ajax("{{ url_for('temphtml') }}", {
+            type: 'POST',
+            data: JSON.stringify(params),
+            contentType: 'application/json; charset=utf-8'
+          });
+
+          return previewCacheRequest;
       }
 
       $('input[type=radio]').change(function () {
@@ -211,20 +324,22 @@
           var newhtml = pymethod(method);
           $('select').html(newhtml);
           
-          // Update placeholder for LLM method
           if (method == 'py_llm') {
-              $('.args').attr('placeholder', 'how much is the product?');
+              $('.args').attr('placeholder', 'Enter your prompt or a JSON schema (e.g. {"type": "object", ...})');
               $('.args').val('');
-              $('#more1').hide(); // Hide the "+" button for LLM
-              $('#new-row').empty(); // Remove any additional rows
-              $('#save').prop('disabled', true); // Disable the "Save" button
-              $('#save').attr('title', 'Save is currently not supported for LLM method'); // Add hover info
+              $('#more1').hide();
+              $('#new-row').empty();
           } else {
               $('.args').attr('placeholder', 'give - if no argument');
               $('.args').val('-');
-              $('#more1').show(); // Show the "+" button for other methods
-              $('#save').prop('disabled', false); // Enable the "Save" button
-              $('#save').removeAttr('title'); // Remove hover info
+              $('#more1').show();
+          }
+          $('#save').prop('disabled', false);
+          $('#save').removeAttr('title');
+          $('#preview').removeAttr('disabled');
+
+          if ($('#url').val() && $('#url').val().includes("http", 0)) {
+            setTimeout(primePreviewCache, 300);
           }
       });
 
@@ -232,30 +347,22 @@
           var url = $(this).val();
           if (url.includes("http",0)) {
             $('#preview').removeAttr('disabled');
-            setTimeout(() => {
-              var params = {
-                "url": url,
-                "preview_id": $('#f_token').val()
-              };
-              $.ajax("{{ url_for('temphtml') }}", {
-                type: 'POST',
-                data: JSON.stringify(params),
-                contentType: 'application/json; charset=utf-8',
-                success: function (data, status, xhr) {
-                },
-                error: function (jqXhr, textStatus, errorMessage) {
-                }
-              });
-             console.log(params);
-            }, 1000);
+            setTimeout(primePreviewCache, 1000);
           }
       });
 
       $('#preview').click(function () {
+          var slowPreviewTimer;
+          var method = $('input[name=c_method]:checked').val();
           $(this).prop('disabled', true);
           $('#result').empty();
           $('.msgs').empty();
-          $('#result').append('<img src='+"{{url_for('static', filename='img/loading_line.gif')}}"+'>');
+          $('#result').append('<div class="skeleton" style="width: 100%; height: 100px;"></div>');
+          slowPreviewTimer = setTimeout(function () {
+            if ($('#preview').prop('disabled')) {
+              $('#result').append('<div id="preview-status-note" class="text-muted mt-3">Still working. Browser and LLM methods may take around 10-15 seconds.</div>');
+            }
+          }, 10000);
           var steps = [];
           var args = [];
           $.each($('.steps'), function (index, val) {
@@ -270,27 +377,51 @@
             "steps": steps,
             "args": args,
             "preview_id": $('#f_token').val(),
-            "c_method": $('input[name=c_method]:checked').val(),
+            "c_method": method,
             "url": $('#url').val(),
             };
-          $.ajax("{{ url_for('preview') }}", {
-            type: 'POST',
-            data: JSON.stringify(params),
-            contentType: 'application/json; charset=utf-8',
-            success: function (data, status, xhr) {
-              $('#result').empty();
-              $('#result').append('<strong>Result: </strong><span style="color:#59A52C;">' + data + '</span>');
-              $('#preview').removeAttr('disabled');
-            },
-            error: function (jqXhr, textStatus, errorMessage) {
-              $('#result').empty();
-              if (errorMessage == "INTERNAL SERVER ERROR") {
-                errorMessage = "Page timeout. Please refresh this page"
+
+          function sendPreviewRequest() {
+            $.ajax("{{ url_for('preview') }}", {
+              type: 'POST',
+              data: JSON.stringify(params),
+              contentType: 'application/json; charset=utf-8',
+              success: function (data, status, xhr) {
+                clearTimeout(slowPreviewTimer);
+                $('#result').empty();
+                $('#result').append('<strong>Result: </strong><span style="color:#59A52C;">' + data + '</span>');
+                $('#preview').removeAttr('disabled');
+              },
+              error: function (jqXhr, textStatus, errorMessage) {
+                clearTimeout(slowPreviewTimer);
+                $('#result').empty();
+                if (errorMessage == "INTERNAL SERVER ERROR") {
+                  errorMessage = "Page timeout. Please refresh this page"
+                }
+                $('#result').append('<strong style="color:rgb(243, 52, 19);">Error: </strong>' + errorMessage);
+                $('#preview').removeAttr('disabled');
               }
-              $('#result').append('<strong style="color:rgb(243, 52, 19);">Error: </strong>' + errorMessage);
-              $('#preview').removeAttr('disabled');
+            });
+          }
+
+          if ((method == 'py_requests' || method == 'py_llm') && previewCacheRequest) {
+            previewCacheRequest.always(function () {
+              previewCacheRequest = null;
+              sendPreviewRequest();
+            });
+          } else if (method == 'py_requests' || method == 'py_llm') {
+            var warmupRequest = primePreviewCache();
+            if (warmupRequest) {
+              warmupRequest.always(function () {
+                previewCacheRequest = null;
+                sendPreviewRequest();
+              });
+            } else {
+              sendPreviewRequest();
             }
-          });
+          } else {
+            sendPreviewRequest();
+          }
           console.log(params);
       });
 
@@ -301,19 +432,17 @@
     $('select.steps').html(newhtml);
 
     if (method == 'py_llm') {
-        $('.args').attr('placeholder', 'how much is the product?');
+        $('.args').attr('placeholder', 'Enter your prompt or a JSON schema (e.g. {"type": "object", ...})');
         $('.args').val('');
-        $('#more1').hide(); // Hide the "+" button for LLM
-        $('#new-row').empty(); // Remove any additional rows
-        $('#save').prop('disabled', true); // Disable the "Save" button
-        $('#save').attr('title', 'Save is currently not supported for LLM method'); // Add hover info
+        $('#more1').hide();
+        $('#new-row').empty();
     } else {
         $('.args').attr('placeholder', 'give - if no argument');
         $('.args').val('-');
-        $('#more1').show(); // Show the "+" button for other methods
-        $('#save').prop('disabled', false); // Enable the "Save" button
-        $('#save').removeAttr('title'); // Remove hover info
+        $('#more1').show();
     }
+    $('#save').prop('disabled', false);
+    $('#save').removeAttr('title');
 });
     </script>
 </html>

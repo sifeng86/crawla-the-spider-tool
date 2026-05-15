@@ -1,229 +1,369 @@
-# Crawla - the spider tool
-All you might want to ask:
+# Crawla - Build Scheduled Crawlers Faster
 
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/sifeng86/crawla-the-spider-tool)
 
-This tool is suitable for developer who need to develop a lot of spiders.  
+Crawla is a Docker-first scraping tool for turning a target page into a repeatable crawler quickly, then running it again on demand or on a schedule. It combines Requests/BS4, Selenium, Playwright, and optional Gemini-assisted extraction behind a web UI, a Studio workspace, and a CLI runtime.
 
-Web interface to create and manage spiders easily for developer.  
-
-No hassle, create a spider in minutes.  
+The product focus is practical: help users find the right selector faster, keep crawlers alive when layouts drift, and make recurring extraction jobs easier to maintain. AI is used as an accelerator for narrow tasks, not as the default execution engine for the whole site.
 
 Demo: https://crawla.cachigo.com
-## Description
 
-A web based spider tooling which provide user a simple entry point to design a spider and it has a live preview section to estimate the result and the result also accumulated in a csv file for further analyzing. 
+## Documentation
 
-## Getting Started
+If you are starting from scratch, read these guides in this order:
 
-### Prerequisite
-#### -- Required
-* Docker
-* Docker-compose
-* Auth0 account (https://auth0.com/)
-* MongoDB (see optional for alternative)
-* Mail Server (see optional for alternative)
-#### -- Optional
-* MongoDB Atlas account (https://www.mongodb.com/cloud/atlas)
-* Sendgrid (https://sendgrid.com/)
+* [docs/OPERATING_GUIDE.md](docs/OPERATING_GUIDE.md) - end-to-end local setup, screen-by-screen usage, extraction methods, preview flow, Studio flow, scheduling, and troubleshooting.
+* [docs/AUTH0_SETUP.md](docs/AUTH0_SETUP.md) - step-by-step Auth0 setup for staging or production.
+* [docs/PRODUCTION_CHECKLIST.md](docs/PRODUCTION_CHECKLIST.md) - production env template, Docker Compose launch flow, and final verification checklist.
 
+## What Crawla Is Good At
 
-### Installation
-#### -- Configuration
-* create ***.env*** file (using .env_example)
+Crawla is strongest when you need to build and keep running a crawler for a page that changes over time.
+
+Typical examples:
+* Repeatedly scraping a specific block such as lottery results, exchange rates, notices, or article headlines.
+* Building a browser-based crawler for pages that require clicks, waits, or JS rendering.
+* Recovering from drifting selectors when class names or DOM paths change.
+* Turning semi-structured pages into strict JSON with a small LLM prompt or schema.
+* Saving a task once and re-running it manually, from the queue, or from a scheduler.
+
+## Current Status
+
+### Available Now
+* Docker-first local stack with Flask, MongoDB, Redis, Selenium Chrome, and Celery.
+* Four extraction methods: Requests/BS4, Selenium, Playwright, and LLM extraction.
+* Step-based execution for Requests, Selenium, and Playwright.
+* Studio workspace route with method catalog, draft schema, and task save/queue flow.
+* Visual Inspector API for cached-preview or live-browser element picking and selector candidate generation.
+* AI Copilot API for draft flow planning, including selector-memory grounding.
+* Selector Memory for domain-scoped selector reuse across successful runs.
+* Runtime selector repair pipeline for Requests, Selenium, and Playwright.
+* JSON Schema based smart extraction for `py_llm`.
+* CLI and scheduler-friendly task execution through `main.py`.
+
+### Partial
+* Studio UI is usable as a guided workspace, but it is still evolving toward a more complete authoring experience.
+* Copilot can draft flows and reuse selector memory, but it does not replace user-owned flow design.
+* Run event schema exists for richer debugging, but full live debugger visibility is not shipped yet.
+
+### Deliberately Not In The Near-Term Plan
+* High-frequency runtime AI orchestration that would materially increase LLM cost.
+* Automatic runtime step completion that silently inserts missing steps.
+* Teaching-mode healing that depends on frequent extra LLM calls during execution.
+
+## Key Features
+
+* **Set & Go Architecture**: Fully containerized local mode with built-in defaults.
+* **4 Extraction Engines**: Use the cheapest runtime that fits the job, then escalate only when needed.
+* **Selector Memory**: Successful selectors are stored by domain, method, and step for future reuse.
+* **Runtime Self-Healing**: Requests, Selenium, and Playwright flows try memory, heuristics, and finally LLM repair when a locator fails.
+* **Visual Inspector**: Generate CSS, XPath, and attribute candidates from either cached HTML or a browser-rendered DOM snapshot instead of guessing selectors manually.
+* **AI Copilot**: Draft starter flows from a goal, URL, and runtime, grounded by method templates and selector memory.
+* **Smart Data Extraction**: Use a prompt or strict JSON Schema with `py_llm` for semi-structured pages.
+* **Concurrency & Scheduling**: Run tasks in parallel and schedule recurring crawls through CLI or queue workflows.
+
+## Cost-Aware AI Principles
+
+Crawla is designed for low-cost AI usage rather than LLM-first execution.
+
+* Prefer `py_requests` or `py_playwright` plus Inspector and selector memory before reaching for `py_llm`.
+* Use selector memory and heuristic fallbacks before LLM selector repair.
+* Keep LLM tasks narrow: one selector fix, one schema extraction, one short planning output.
+* Default to lighter models and small output budgets whenever possible.
+* Keep Gemini optional. Local mode works without LLM features enabled.
+
+Recommended Gemini settings for cost control:
+* `model`: use a light/fast model such as Gemini Flash class models.
+* `thinking_level`: set to `MINIMAL` when supported.
+* `max_output_tokens`: set a low ceiling for narrow tasks.
+
+## Quick Start
+
+### Prerequisites
+* Docker with Compose support
+* Google Gemini API Key only if you want LLM-based features
+* WSL or another Unix-like shell if you want to use the `cp` examples as written on Windows
+
+### Local Mode
+
+**Step 1 - Start the stack**
+```bash
+docker compose up -d --build
 ```
-#path: login/
 
-# Application configuration
-APP_PORT=3000
-APP_ENV=development
-SECRET_KEY=aaaaaaaaaa
+That is enough for local mode.
+* Open `http://localhost:3000`
+* Click `Get Started`
+* Local mode signs you in as Local Admin
+* MongoDB, Redis, Selenium Chrome, and Celery are managed by Docker
 
-# AUTH0 configuration
-APP_PORT=3000
-APP_ENV=development
-AUTH0_CLIENT_ID=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-AUTH0_DOMAIN=abcdefg-999.us.auth0.com
-AUTH0_CLIENT_SECRET=
-AUTH0_CALLBACK_URL=http://localhost:3000/callback
-AUTH0_LOGOUT_REDIRECT_URL=http://localhost:3000/
-AUTH0_AUDIENCE=
+**Step 2 - Optional app settings**
 
-
-# Google API key configuration
-GOOGLE_API_KEY=AAAA
-
-
-#explanation:
-1. Please refer the tutorial to get the needed info:
-https://auth0.com/docs/quickstart/webapp/python#configure-auth0
-2. "SECRET_KEY" is a key that flask section needed. You can input any string.
-3. This project is using google-gemini as LLM example.
-
+WSL / macOS / Linux:
+```bash
+cp login/.env_example login/.env
 ```
 
-* create ***config.json*** file (using config_example.json)
+PowerShell:
+```powershell
+Copy-Item login/.env_example login/.env
 ```
-#path: login/setting/
 
+If you want LLM features locally, set `GOOGLE_API_KEY=your-key` in `login/.env`.
+
+**Step 3 - Optional LLM defaults**
+
+WSL / macOS / Linux:
+```bash
+cp login/setting/config_example.json login/setting/config.json
+```
+
+PowerShell:
+```powershell
+Copy-Item login/setting/config_example.json login/setting/config.json
+```
+
+Use `login/setting/config.json` only for non-sensitive fallback defaults such as model, temperature, or token limits.
+Keep Gemini secrets in `login/.env` for local Docker or `.env.production` / `GOOGLE_API_KEY_FILE` for production.
+
+If `login/setting/config.json` still contains `llm.gemini.api_key`, move that value to `GOOGLE_API_KEY` and clear the JSON field.
+
+For lower-cost LLM usage, prefer settings like:
+```json
 {
-    "host_url": "www.example.com",
-    "mongo_mode": "atlas or local (either one)",
-    "atlas_host": "cluster9999.abcdefg.mongodb.net",
-    "atlas_db": "example",
-    "atlas_user": "hehe",
-    "atlas_pw": "gABCDE(must use encryption)",
-    "redis_host_port": "redislabs.com:9999 or local (either one)",
-    "redis_user": "hehe",
-    "redis_pw": "gAA(must use encryption)",
-    "mail_host": "smtp.sendgrid.net",
-    "mail_port": 465,
-    "mail_sender": "me@example.com",
-    "mail_user":"apikey",
-    "mail_pw": "gAA(must use encryption)"
-    "llm": {
-        "gemini": {
-            "api_key": "gAA",
-            "model": "gemini-2.5-flash-preview-04-17",
-            "temperature": 0.7
-        },
-        "openapi": {
-            "api_key": "",
-            "model": "",
-            "temperature": 0.7
-        }
+  "llm": {
+    "gemini": {
+      "model": "gemini-2.5-flash-preview-04-17",
+      "thinking_level": "MINIMAL",
+      "max_output_tokens": 512
     }
+  }
 }
+```
 
-#explanation:
-1. "host_url" is your site url
-2. (mongo, redis) you can skip user/pw if using local mode.
-3. "must be encryption" mean need to use encryption tool
-4. encryption tool usage will be covered later on.
-5. llm gemini is an option if you want to use LLM feature.
-6. openapi not yet support, but it's in the future plan.
+## Core Workflow
 
+The intended workflow is straightforward:
+
+1. Pick the cheapest runtime that can solve the page.
+2. Load a preview or browser view.
+3. Use Inspector to generate selector candidates instead of writing them blind.
+4. Save a task with visible steps and arguments.
+5. Re-run it manually, from the queue, or from a scheduler.
+6. Let selector memory and runtime healing reduce maintenance when the site drifts.
+
+For recurring pages such as lottery results, notices, or price blocks, this is the main value of Crawla today.
+
+## Web UI Map
+
+* `/login` - local mode creates a `Local Admin` session automatically; production and staging redirect to Auth0.
+* `/contents` - classic builder for step-based task creation, previews, saved-task controls, schedule toggling, and CSV download.
+* `/studio` - visual workspace with method cards, draft payload, inspector, copilot, flow editor, and selector-memory panels.
+* `/dashboard` - signed-in profile summary.
+
+For a full walkthrough of each screen, see [docs/OPERATING_GUIDE.md](docs/OPERATING_GUIDE.md).
+
+## Authentication Modes
+
+### Local Mode
+
+`docker compose up -d --build` defaults to `APP_ENV=local`, so clicking `Get Started` signs you in as `Local Admin`. This is the intended development mode.
+
+### Staging / Production Mode
+
+For Docker deployments, copy `.env.production.example` to `.env.production`, fill the Auth0 settings there, then launch with `docker compose --env-file .env.production -f docker-compose.production.yml up -d --build`. Crawla will then redirect `/login` to Auth0, create a session from the returned user profile, and scope saved tasks by that user id.
+
+Each authenticated user sees only their own tasks, previews, and Studio saves.
+
+See [docs/AUTH0_SETUP.md](docs/AUTH0_SETUP.md) for the complete setup flow.
+
+## Extraction Methods
+
+### Requests / BS4
+
+Fast HTTP requests with BeautifulSoup selectors. Best for static pages, low-cost previews, and broad recurring crawls.
+
+### Selenium
+
+Remote Chrome browser automation. Best when you need compatibility with existing browser-oriented steps or interaction flows.
+
+### Playwright
+
+The primary Studio browser runtime for richer locators and future stateful flows. Best for JS-heavy pages, clicks, waits, and modern browser automation.
+
+### LLM Extraction
+
+Gemini-backed extraction for pages that are noisy or semi-structured.
+
+Supported modes:
+* **Prompt mode**: ask a direct question in the argument field.
+* **JSON Schema mode**: provide a strict schema and return structured JSON.
+
+Use `py_llm` when schema extraction is the simplest path, not as the default answer for every site.
+
+## Studio Workspace
+
+Studio is the product direction for building crawlers faster while keeping the final flow visible and editable.
+
+### Available Now
+* `/studio` workspace shell and draft schema.
+* Method catalog with starter nodes for each runtime.
+* `/studio/api/inspector` for selector picking from cached HTML or live browser DOM snapshots.
+* Inspector uses cached HTML for `py_requests` and `py_llm`, and browser-rendered DOM snapshots for `py_selenium` and `py_playwright`.
+* `/studio/api/copilot` for goal-to-flow draft generation.
+* `/studio/api/selector-memory` for domain-level selector memory summaries.
+* Studio task save and queue dispatch flow.
+
+### Partial
+* The workspace already supports draft planning and selector-guided authoring, but it is not yet a fully stateful multi-step browser IDE.
+* Copilot drafts are grounded and useful, but they are still suggestions that users should review and own.
+
+### Coming Later
+* Richer stateful flow authoring.
+* Better run visibility and healing traces.
+* Broader productized integrations around notifications and operational workflows.
+
+## Selector Memory And Runtime Healing
+
+When a self-healable navigation step fails, Crawla does not jump straight to LLM.
+
+Current recovery order:
+1. Try selector memory from previous successful runs on the same domain.
+2. Try deterministic heuristic fallback candidates derived from the failed selector.
+3. Only then ask Gemini for a replacement parameter.
+4. Retry the step with the recovered parameter and store the success back into selector memory.
+
+This applies to step-based Requests, Selenium, and Playwright flows. It repairs wrong or drifting locator parameters, but it does not generate missing runtime steps.
+
+## Scheduling And Automation
+
+Tasks can be saved and run through the app or invoked directly through `main.py`.
+
+The saved-task list now supports two low-cost control points that make recurring crawls easier to manage:
+
+* `Run now` queues a saved task immediately without changing its schedule status.
+* Scheduled batch runs only execute tasks where `schedule_enabled` is not set to `false`, so a task can be paused without deleting it.
+
+Example crontab:
+```bash
+# Run all tasks every day at 1 AM
+0 1 * * * docker exec -t crawla_web python ./main.py --all >> /log/crawla.log 2>&1
 ```
-#### -- First Run
+
+CLI options:
+* `--all` - all tasks
+* `--py_requests` - Requests/BS4 tasks only
+* `--py_selenium` - Selenium tasks only
+* `--py_playwright` - Playwright tasks only
+* `--py_llm` - LLM tasks only
+* `--task TASKID` - specific task by ID
+* `--user USERID` - latest task for a specific user
+
+## Advanced Configuration
+
+### Auth0 For Production
+
+For Docker production, copy `.env.production.example` to `.env.production` and configure Auth0 there.
+
+```env
+APP_ENV=production
+SECRET_KEY=replace-with-a-long-random-secret
+AUTH0_CLIENT_ID=your_client_id
+AUTH0_DOMAIN=your-tenant.us.auth0.com
+AUTH0_CLIENT_SECRET=your_secret
+AUTH0_CALLBACK_URL=https://your-domain.com/callback
+AUTH0_LOGOUT_REDIRECT_URL=https://your-domain.com/
 ```
-docker-compose build
+
+Use a Regular Web Application in Auth0. The callback URL must exactly match `AUTH0_CALLBACK_URL`, and the logout URL must exactly match `AUTH0_LOGOUT_REDIRECT_URL`.
+
+For the full checklist, including verification steps, see [docs/AUTH0_SETUP.md](docs/AUTH0_SETUP.md).
+
+Production Docker now ships with a minimal Gunicorn profile through `gunicorn.conf.py` and `.env.production.example`, so you do not need to assemble a custom WSGI setup from scratch.
+
+### MongoDB Atlas
+
+The recommended production path is now `CRAWLA_MONGO_URI` in `.env.production`.
+
+Legacy `config.json` Atlas settings still work:
+
+```json
+{
+  "mongo_mode": "atlas",
+  "atlas_host": "cluster.mongodb.net",
+  "atlas_db": "crawla",
+  "atlas_user": "username",
+  "atlas_pw": "encrypted_password"
+}
 ```
-#### -- Encryption tool
-1.Run docker.
-```
-docker run -it --rm -v ${PWD}:/work --name crawla crawla_web:latest bash
-```
-2.Generate key(first time only):
-```
+
+If you keep using `config.json`, legacy Atlas passwords must still be encrypted. Inside the Docker container:
+```bash
+docker exec -it crawla_web bash
 python key_generator.py
-```
-- rename the key to **"secret.key"** inside **<key>** folder
-
-3.Encrypt token & password.
-```
 python encrypt_token.py
 ```
-```
-Enter your token: (type something here)
-```
-- return:
-```
-'gAAAAABgGSLAtS13rMuiKa6CkBP-ThisisexampleBd8zfEH2M2tr5Tgrq4N9whg=='
-Token is encrypted.
-```
-- copy the generated string only.
 
-4.Input the related information in **"setting/config.json"** file.
-- "atlas_pw", "redis_pw" and "mail_pw" must be encrypted.
+For simpler production secrets, prefer environment variables or `*_FILE` secrets instead of encrypted values inside `config.json`. At this point, `config.json` should be treated as a legacy fallback for non-sensitive defaults only.
 
-## Running the tool
-* Start the docker 
-  * add  **-d**  to run in the background
-```
-docker-compose up
-```
-* Stop the docker 
-```
-docker-compose down
-```
+## Architecture
 
-
-### Run the job periodic using crontab
-
-Run tasks at custom scheduled time. \
-*(Currently not support LLM method.)*
-```
-0 1 * * * docker exec -t crawla_web python ./main.py --all >> /log/xx.log 2>&1
-```
-* **--all** (all tasks)
-* **--py_requests** Request tasks only)
-* **--py_selenium** (Selenium tasks only)
-* **--user userid** (Certain user only)
-* **--task taskid** (Certain task only)
-
-Export the results to csv file
-```
-0 1 * * * docker exec -t crawla_web python ./export_csv.py --task taskid >> /log/xx.log 2>&1
-```
-* **--task taskid** (Certain task only)
-* **--all** (all tasks)
-
-Send the result by mail for specific task only
-```
-0 1 * * * docker exec -t crawla_web python ./sendmail.py --task taskid >> /log/xx.log 2>&1
-```
-* **--task taskid** (Certain task only)
-
-*PS: You can get the taskid in the download link of the csv file*
-
-## More
-#### Advance
-You can limit the redis usage if your server has resources limitation.
-* log in to the running redis contatiner.
-```
-docker exec -it crawla_redis sh
+```text
+login/server.py      -> Flask web UI + Studio/API routes
+main.py              -> Crawler engine + selector healing pipeline
+celery_task1.py      -> Async task queue (Celery + Redis)
+login/lib/
+  mongo.py           -> MongoDB connection (Atlas + local)
+  celery.py          -> Redis/Celery helper
+  step_helper.py     -> Safe step dispatch for BS4 / Selenium / Playwright
+  llm_handler.py     -> Gemini integration, caching, self-healing, schema extraction
+  selector_memory.py -> Domain-scoped selector reuse and fallback ranking
+  studio.py          -> Studio schema, method catalog, feature flags
+  studio_inspector.py-> Cached-preview and browser-snapshot element picker
+  studio_copilot.py  -> Goal-to-flow planning with selector-memory grounding
+  stealth.py         -> Anti-detection helpers
+  rate_limiter.py    -> Per-domain rate limiting
+  playwright_helper.py -> Playwright stealth context manager
 ```
 
+**Infrastructure (Docker Compose)**
+
+| Service | Image | Port |
+|---------|-------|------|
+| `crawla_web` | Python 3.12 + Flask + Celery | 3000 |
+| `crawla_mongo` | mongo:6.0 | 27017 (internal) |
+| `crawla_redis` | redis:7.4-alpine | 6379 (internal) |
+| `crawla_chrome` | selenium/standalone-chrome:131 | 4444 (internal) |
+
+## Troubleshooting
+
+### Local mode only shows `Local Admin`
+
+That is expected when `APP_ENV=local`. To test real Auth0 login, switch to `APP_ENV=production` with valid `AUTH0_*` values. See [docs/AUTH0_SETUP.md](docs/AUTH0_SETUP.md).
+
+### Buttons or method switches do nothing
+
+Rebuild or restart the web container after pulling frontend changes:
+
+```bash
+docker compose up -d --build
 ```
-redis-cli
 
-127.0.0.1:6379> config get maxmemory
-1) "maxmemory"
-2) "0"
-127.0.0.1:6379> config set maxmemory 100MB
-OK
-127.0.0.1:6379> config get maxmemory
-1) "maxmemory"
-2) "104857600"
-127.0.0.1:6379> config set maxmemory-policy volatile-lru
-OK
-127.0.0.1:6379> config get maxmemory-policy
-1) "maxmemory-policy"
-2) "volatile-lru"
-127.0.0.1:6379> config set maxclients 1000
-OK
+If the app was already running before a template or JS change, use:
 
+```bash
+docker compose restart crawla_web
 ```
 
-## Authors
+### Browser preview cannot reach a local target
 
-Alan Gan (https://www.linkedin.com/in/iamalan)
-
-## Version History
-
-* 1.1
-    * Add LLM feature
-* 1.0 Beta
-    * Initial Release
+When Selenium or Playwright runs inside Docker, `127.0.0.1` points at the browser container, not your host machine. Use a container-reachable target such as `http://crawla_web:3000/` when you are testing against the local stack.
 
 ## License
 
-This project is licensed under the Apache License 2.0 - see the LICENSE.txt file for details
+This project is licensed under the Apache License 2.0. See `LICENSE.txt` for details.
 
-## Acknowledgments
+## Authors
 
-Inspiration, code snippets, etc.
-* [Auth0 Python SDK](https://github.com/auth0-samples/auth0-python-web-app/)
-* [Flask](https://flask.palletsprojects.com/)
-* [Celery](https://docs.celeryproject.org)
-* more...
+* Alan Gan
+* UI/UX and core optimizations by Antigravity

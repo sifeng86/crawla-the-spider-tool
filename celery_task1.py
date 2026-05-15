@@ -1,10 +1,73 @@
 import sys
 import subprocess
+import json
 from login.lib.celery import celeryHelper
 
 
 # Connection to redis
 app = celeryHelper.redis_conn()
+
+PREVIEW_SEPARATOR = '_&_'
+LLM_METHOD = 'py_llm'
+DEFAULT_PREVIEW_TIMEOUT = 50
+DEFAULT_PREVIEW_EXPIRES = 120
+LLM_PREVIEW_TIMEOUT = 570
+LLM_PREVIEW_EXPIRES = 600
+LLM_SOFT_TIME_LIMIT = 540
+LLM_TIME_LIMIT = 600
+
+
+def get_preview_method(args: str) -> str:
+    try:
+        payload = json.loads(args)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        payload = None
+
+    if isinstance(payload, dict):
+        return str(payload.get('c_method', '')).strip()
+
+    parts = args.split(PREVIEW_SEPARATOR)
+    if len(parts) < 4:
+        return ''
+    return parts[3]
+
+
+def get_crawl_async_options(method: str) -> dict:
+    if method == LLM_METHOD:
+        return {
+            'soft_time_limit': LLM_SOFT_TIME_LIMIT,
+            'time_limit': LLM_TIME_LIMIT,
+        }
+    return {}
+
+
+def get_preview_async_options(args: str) -> dict:
+    method = get_preview_method(args)
+    options = {
+        'expires': DEFAULT_PREVIEW_EXPIRES,
+    }
+    if method == LLM_METHOD:
+        options['expires'] = LLM_PREVIEW_EXPIRES
+    options.update(get_crawl_async_options(method))
+    return options
+
+
+def get_preview_timeout(args: str) -> int:
+    return LLM_PREVIEW_TIMEOUT if get_preview_method(args) == LLM_METHOD else DEFAULT_PREVIEW_TIMEOUT
+
+
+def get_task_method(task_id: str) -> str:
+    from login.lib.mongo import mongoHelper
+
+    db = mongoHelper.mongo_conn()
+    record = db.urls.find_one({'task_id': task_id}, {'c_method': 1})
+    if not record:
+        return ''
+    return record.get('c_method', '')
+
+
+def get_task_async_options(task_id: str) -> dict:
+    return get_crawl_async_options(get_task_method(task_id))
 
 @app.task(name='crawl')
 def crawl(mode, args):
@@ -56,9 +119,9 @@ if __name__ == "__main__":
         # python celery_task1.py --preview pid0_&_steps_&_args_&_method
         if len(sys.argv) == 3:
             args = sys.argv[2]
-            ret = crawl.apply_async(('--preview', args), expires=120)
+            ret = crawl.apply_async(('--preview', args), **get_preview_async_options(args))
             count = 0
-            result_output = ret.get(timeout=50, propagate=False)
+            result_output = ret.get(timeout=get_preview_timeout(args), propagate=False)
             ret.forget()
             print(str(result_output))
             
@@ -68,8 +131,9 @@ if __name__ == "__main__":
         # python celery_task1.py --task taskid
         if len(sys.argv) == 3:
             task_id = sys.argv[2]
+            crawl_signature = crawl.s('--task', task_id).set(**get_task_async_options(task_id))
             # add two tasks into queue and chaining with pipe
-            (crawl.s('--task', task_id) | export_csv.s('--task',
+            (crawl_signature | export_csv.s('--task',
             task_id) | send_email.s('--task', task_id)).apply_async()
         else:
             exit('task parameter is missing')
