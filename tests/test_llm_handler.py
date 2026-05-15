@@ -1,6 +1,7 @@
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -65,7 +66,7 @@ class LlmHandlerTests(unittest.TestCase):
         )
 
     def test_get_gemini_smart_extraction_returns_structured_json(self):
-        with unittest.mock.patch('login.lib.llm_handler.get_gemini_response', return_value='{"title": "Crawla"}'):
+        with patch('login.lib.llm_handler.get_gemini_response', return_value='{"title": "Crawla"}'):
             result = get_gemini_smart_extraction('{"type":"object"}', '<html></html>')
 
         self.assertEqual(result, {'title': 'Crawla'})

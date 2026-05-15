@@ -1,0 +1,110 @@
+services:
+  crawla_web:
+    build: .
+    init: true
+    ports:
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
+    volumes:
+      - downloads_data:/work/login/downloads
+    networks:
+      - crw
+    restart: unless-stopped
+    stop_grace_period: 45s
+    environment:
+      PYTHONUNBUFFERED: "1"
+      APP_ENV: ${APP_ENV:-production}
+      APP_PORT: ${APP_PORT:-3000}
+      CRAWLA_WEB_SERVER: ${CRAWLA_WEB_SERVER:-gunicorn}
+      SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env.production}
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-2}
+      GUNICORN_THREADS: ${GUNICORN_THREADS:-4}
+      GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-120}
+      GUNICORN_GRACEFUL_TIMEOUT: ${GUNICORN_GRACEFUL_TIMEOUT:-30}
+      GUNICORN_KEEPALIVE: ${GUNICORN_KEEPALIVE:-5}
+      GUNICORN_MAX_REQUESTS: ${GUNICORN_MAX_REQUESTS:-1000}
+      GUNICORN_MAX_REQUESTS_JITTER: ${GUNICORN_MAX_REQUESTS_JITTER:-100}
+      GUNICORN_LOG_LEVEL: ${GUNICORN_LOG_LEVEL:-info}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      GOOGLE_API_KEY_FILE: ${GOOGLE_API_KEY_FILE:-}
+      AUTH0_CLIENT_ID: ${AUTH0_CLIENT_ID:?set AUTH0_CLIENT_ID in .env.production}
+      AUTH0_CLIENT_SECRET: ${AUTH0_CLIENT_SECRET:?set AUTH0_CLIENT_SECRET in .env.production}
+      AUTH0_DOMAIN: ${AUTH0_DOMAIN:?set AUTH0_DOMAIN in .env.production}
+      AUTH0_CALLBACK_URL: ${AUTH0_CALLBACK_URL:?set AUTH0_CALLBACK_URL in .env.production}
+      AUTH0_LOGOUT_REDIRECT_URL: ${AUTH0_LOGOUT_REDIRECT_URL:?set AUTH0_LOGOUT_REDIRECT_URL in .env.production}
+      AUTH0_AUDIENCE: ${AUTH0_AUDIENCE:-}
+      CRAWLA_STUDIO_ENABLED: ${CRAWLA_STUDIO_ENABLED:-true}
+      CRAWLA_STUDIO_INSPECTOR_ENABLED: ${CRAWLA_STUDIO_INSPECTOR_ENABLED:-true}
+      CRAWLA_STUDIO_COPILOT_ENABLED: ${CRAWLA_STUDIO_COPILOT_ENABLED:-true}
+      CRAWLA_STUDIO_DEBUGGER_ENABLED: ${CRAWLA_STUDIO_DEBUGGER_ENABLED:-false}
+      CRAWLA_MONGO_MODE: ${CRAWLA_MONGO_MODE:-local}
+      CRAWLA_MONGO_DB: ${CRAWLA_MONGO_DB:-crawla}
+      CRAWLA_MONGO_URI: ${CRAWLA_MONGO_URI:-}
+      CRAWLA_ATLAS_HOST: ${CRAWLA_ATLAS_HOST:-}
+      CRAWLA_ATLAS_DB: ${CRAWLA_ATLAS_DB:-}
+      CRAWLA_ATLAS_USER: ${CRAWLA_ATLAS_USER:-}
+      CRAWLA_ATLAS_PASSWORD: ${CRAWLA_ATLAS_PASSWORD:-}
+      CRAWLA_ATLAS_PASSWORD_FILE: ${CRAWLA_ATLAS_PASSWORD_FILE:-}
+      CRAWLA_REDIS_HOST_PORT: ${CRAWLA_REDIS_HOST_PORT:-local}
+      CRAWLA_REDIS_URL: ${CRAWLA_REDIS_URL:-}
+      CRAWLA_REDIS_PASSWORD: ${CRAWLA_REDIS_PASSWORD:-}
+      CRAWLA_REDIS_PASSWORD_FILE: ${CRAWLA_REDIS_PASSWORD_FILE:-}
+      CRAWLA_HOST_URL: ${CRAWLA_HOST_URL:-}
+      CRAWLA_MAIL_HOST: ${CRAWLA_MAIL_HOST:-}
+      CRAWLA_MAIL_PORT: ${CRAWLA_MAIL_PORT:-465}
+      CRAWLA_MAIL_SENDER: ${CRAWLA_MAIL_SENDER:-}
+      CRAWLA_MAIL_USER: ${CRAWLA_MAIL_USER:-}
+      CRAWLA_MAIL_PASSWORD: ${CRAWLA_MAIL_PASSWORD:-}
+      CRAWLA_MAIL_PASSWORD_FILE: ${CRAWLA_MAIL_PASSWORD_FILE:-}
+      CRAWLA_GEMINI_MODEL: ${CRAWLA_GEMINI_MODEL:-gemini-2.5-flash-preview-04-17}
+      CRAWLA_GEMINI_TEMPERATURE: ${CRAWLA_GEMINI_TEMPERATURE:-0.7}
+      CRAWLA_GEMINI_MAX_OUTPUT_TOKENS: ${CRAWLA_GEMINI_MAX_OUTPUT_TOKENS:-512}
+      CRAWLA_GEMINI_THINKING_LEVEL: ${CRAWLA_GEMINI_THINKING_LEVEL:-MINIMAL}
+    depends_on:
+      - redis
+      - chrome
+      - mongo
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:3000/', timeout=5)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  chrome:
+    image: "selenium/standalone-chrome:131.0"
+    expose:
+      - "4444"
+    networks:
+      - crw
+    restart: unless-stopped
+    shm_size: '2gb'
+    environment:
+      - SE_NODE_MAX_SESSIONS=4
+      - SE_NODE_OVERRIDE_MAX_SESSIONS=true
+
+  redis:
+    image: redis:7.4-alpine
+    expose:
+      - "6379"
+    networks:
+      - crw
+    restart: unless-stopped
+    command: redis-server --maxmemory 100mb --maxmemory-policy volatile-lru
+
+  mongo:
+    image: mongo:6.0
+    expose:
+      - "27017"
+    networks:
+      - crw
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+
+networks:
+  crw:
+    driver: bridge
+
+volumes:
+  mongo_data:
+  downloads_data:
