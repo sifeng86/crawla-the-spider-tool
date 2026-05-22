@@ -24,6 +24,7 @@ services:
       GUNICORN_MAX_REQUESTS: ${GUNICORN_MAX_REQUESTS:-1000}
       GUNICORN_MAX_REQUESTS_JITTER: ${GUNICORN_MAX_REQUESTS_JITTER:-100}
       GUNICORN_LOG_LEVEL: ${GUNICORN_LOG_LEVEL:-info}
+      CRAWLA_ENABLE_APP_HSTS: ${CRAWLA_ENABLE_APP_HSTS:-false}
       GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
       GOOGLE_API_KEY_FILE: ${GOOGLE_API_KEY_FILE:-}
       AUTH0_CLIENT_ID: ${AUTH0_CLIENT_ID:?set AUTH0_CLIENT_ID in .env.production}
@@ -71,7 +72,7 @@ services:
       start_period: 20s
 
   chrome:
-    image: "selenium/standalone-chrome:131.0"
+    image: ${CRAWLA_SELENIUM_IMAGE:-selenium/standalone-chrome:131.0}
     expose:
       - "4444"
     networks:

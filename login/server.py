@@ -82,6 +82,7 @@ AUTH0_CLIENT_ID = env.get(constants.AUTH0_CLIENT_ID)
 AUTH0_CLIENT_SECRET = env.get(constants.AUTH0_CLIENT_SECRET)
 AUTH0_DOMAIN = env.get(constants.AUTH0_DOMAIN)
 AUTH0_BASE_URL = f'https://{AUTH0_DOMAIN}' if AUTH0_DOMAIN else None
+AUTH0_SERVER_METADATA_URL = f'{AUTH0_BASE_URL}/.well-known/openid-configuration' if AUTH0_BASE_URL else None
 AUTH0_AUDIENCE = env.get(constants.AUTH0_AUDIENCE)
 
 app = Flask(__name__, static_url_path='/public', static_folder='./public')
@@ -137,6 +138,34 @@ def normalize_boolean(value, default=False):
     if isinstance(value, bool):
         return value
     return str(value).strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
+def should_apply_hsts():
+    if get_app_env() != 'production':
+        return False
+    return normalize_boolean(env.get(constants.CRAWLA_ENABLE_APP_HSTS), default=True)
+
+
+def build_auth0_registration_kwargs():
+    return {
+        'client_id': AUTH0_CLIENT_ID,
+        'client_secret': AUTH0_CLIENT_SECRET,
+        'api_base_url': AUTH0_BASE_URL,
+        'server_metadata_url': AUTH0_SERVER_METADATA_URL,
+        'client_kwargs': {
+            'scope': 'openid profile email',
+        },
+    }
+
+
+def build_auth0_authorize_kwargs():
+    authorize_kwargs = {
+        'redirect_uri': AUTH0_CALLBACK_URL,
+    }
+    audience = str(AUTH0_AUDIENCE or '').strip()
+    if audience:
+        authorize_kwargs['audience'] = audience
+    return authorize_kwargs
 
 
 def is_valid_form_token(token):
@@ -300,7 +329,7 @@ def apply_security_headers(response):
     response.headers.setdefault('X-Content-Type-Options', 'nosniff')
     response.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
     response.headers.setdefault('Content-Security-Policy', build_content_security_policy())
-    if get_app_env() == 'production':
+    if should_apply_hsts():
         response.headers.setdefault('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
     return response
 
@@ -380,14 +409,7 @@ auth0 = None
 if is_auth0_configured():
     auth0 = oauth.register(
         'auth0',
-        client_id=AUTH0_CLIENT_ID,
-        client_secret=AUTH0_CLIENT_SECRET,
-        api_base_url=AUTH0_BASE_URL,
-        access_token_url=AUTH0_BASE_URL + '/oauth/token',
-        authorize_url=AUTH0_BASE_URL + '/authorize',
-        client_kwargs={
-            'scope': 'openid profile email',
-        },
+        **build_auth0_registration_kwargs(),
     )
 
 
@@ -435,7 +457,7 @@ def login():
         return redirect(url_for('contents'))
     if auth0 is None:
         return "Auth0 is not configured", 503
-    return auth0.authorize_redirect(redirect_uri=AUTH0_CALLBACK_URL, audience=AUTH0_AUDIENCE)
+    return auth0.authorize_redirect(**build_auth0_authorize_kwargs())
 
 
 @app.route('/contents', methods=['POST','GET'])
