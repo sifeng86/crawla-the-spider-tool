@@ -20,6 +20,7 @@ class PackagingTests(unittest.TestCase):
 
         env_content = env_example.read_text(encoding='utf-8')
         compose_content = compose.read_text(encoding='utf-8')
+        local_compose_content = (ROOT / 'docker-compose.yml').read_text(encoding='utf-8')
         gunicorn_content = gunicorn_config.read_text(encoding='utf-8')
 
         self.assertIn('CRAWLA_MONGO_URI=', env_content)
@@ -28,16 +29,23 @@ class PackagingTests(unittest.TestCase):
         self.assertIn('GOOGLE_API_KEY_FILE=', env_content)
         self.assertIn('CRAWLA_WEB_SERVER=gunicorn', env_content)
         self.assertIn('GUNICORN_WORKERS=2', env_content)
+        self.assertIn('CRAWLA_ENABLE_APP_HSTS=false', env_content)
+        self.assertIn('CRAWLA_SELENIUM_IMAGE=selenium/standalone-chrome:131.0', env_content)
+        self.assertIn('selenium/standalone-chromium:131.0', env_content)
 
         self.assertIn('127.0.0.1:${APP_PORT:-3000}:3000', compose_content)
         self.assertIn('CRAWLA_WEB_SERVER: ${CRAWLA_WEB_SERVER:-gunicorn}', compose_content)
         self.assertIn('GUNICORN_WORKERS: ${GUNICORN_WORKERS:-2}', compose_content)
+        self.assertIn('CRAWLA_ENABLE_APP_HSTS: ${CRAWLA_ENABLE_APP_HSTS:-false}', compose_content)
+        self.assertIn('image: ${CRAWLA_SELENIUM_IMAGE:-selenium/standalone-chrome:131.0}', compose_content)
         self.assertIn('healthcheck:', compose_content)
         self.assertIn('init: true', compose_content)
         self.assertNotIn('.:/work', compose_content)
         self.assertNotIn('4444:4444', compose_content)
         self.assertNotIn('6379:6379', compose_content)
         self.assertNotIn('27017:27017', compose_content)
+
+        self.assertIn('image: ${CRAWLA_SELENIUM_IMAGE:-selenium/standalone-chrome:131.0}', local_compose_content)
 
         self.assertIn("wsgi_app = 'server:app'", gunicorn_content)
         self.assertIn("chdir = '/work/login'", gunicorn_content)

@@ -181,6 +181,65 @@ class ServerModuleTests(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.headers.get('Strict-Transport-Security'), 'max-age=31536000; includeSubDomains')
 
+    def test_security_headers_skip_hsts_when_app_hsts_is_disabled(self):
+        env_vars = {
+            'APP_ENV': 'production',
+            'SECRET_KEY': 'test-secret',
+            'CRAWLA_ENABLE_APP_HSTS': 'false',
+            'AUTH0_CLIENT_ID': '',
+            'AUTH0_CLIENT_SECRET': '',
+            'AUTH0_DOMAIN': '',
+            'AUTH0_CALLBACK_URL': '',
+            'AUTH0_LOGOUT_REDIRECT_URL': '',
+            'AUTH0_AUDIENCE': '',
+        }
+        with patch.dict(os.environ, env_vars, clear=False):
+            module, _ = load_server_module(env_vars)
+            client = module.app.test_client()
+
+            response = client.get('/')
+
+            self.assertEqual(response.status_code, 200)
+            self.assertIsNone(response.headers.get('Strict-Transport-Security'))
+
+    def test_auth0_registration_uses_oidc_metadata(self):
+        env_vars = {
+            'APP_ENV': 'production',
+            'SECRET_KEY': 'test-secret',
+            'AUTH0_CLIENT_ID': 'client-id',
+            'AUTH0_CLIENT_SECRET': 'client-secret',
+            'AUTH0_DOMAIN': 'example.us.auth0.com',
+            'AUTH0_CALLBACK_URL': 'https://crawla.example.com/callback',
+            'AUTH0_LOGOUT_REDIRECT_URL': 'https://crawla.example.com/',
+            'AUTH0_AUDIENCE': '',
+        }
+        with patch.dict(os.environ, env_vars, clear=False):
+            module, _ = load_server_module(env_vars)
+
+            self.assertEqual(
+                module.build_auth0_registration_kwargs()['server_metadata_url'],
+                'https://example.us.auth0.com/.well-known/openid-configuration',
+            )
+
+    def test_auth0_authorize_redirect_omits_blank_audience(self):
+        env_vars = {
+            'APP_ENV': 'production',
+            'SECRET_KEY': 'test-secret',
+            'AUTH0_CLIENT_ID': 'client-id',
+            'AUTH0_CLIENT_SECRET': 'client-secret',
+            'AUTH0_DOMAIN': 'example.us.auth0.com',
+            'AUTH0_CALLBACK_URL': 'https://crawla.example.com/callback',
+            'AUTH0_LOGOUT_REDIRECT_URL': 'https://crawla.example.com/',
+            'AUTH0_AUDIENCE': '   ',
+        }
+        with patch.dict(os.environ, env_vars, clear=False):
+            module, _ = load_server_module(env_vars)
+
+            self.assertEqual(
+                module.build_auth0_authorize_kwargs(),
+                {'redirect_uri': 'https://crawla.example.com/callback'},
+            )
+
     def test_preview_rate_limit_returns_429(self):
         with patch.dict(os.environ, {'APP_ENV': 'local', 'SECRET_KEY': 'test-secret'}, clear=False):
             module, _ = load_server_module({'APP_ENV': 'local', 'SECRET_KEY': 'test-secret'})

@@ -27,7 +27,7 @@ services:
       - mongo
 
   chrome:
-    image: "selenium/standalone-chrome:131.0"
+    image: ${CRAWLA_SELENIUM_IMAGE:-selenium/standalone-chrome:131.0}
     ports:
       - "4444:4444"
     networks:
