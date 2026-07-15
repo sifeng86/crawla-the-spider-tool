@@ -113,31 +113,14 @@ If you want LLM features locally, set `GOOGLE_API_KEY=your-key` in `login/.env`.
 
 **Step 3 - Optional LLM defaults**
 
-WSL / macOS / Linux:
-```bash
-cp login/setting/config_example.json login/setting/config.json
-```
-
-PowerShell:
-```powershell
-Copy-Item login/setting/config_example.json login/setting/config.json
-```
-
-Use `login/setting/config.json` only for non-sensitive fallback defaults such as model, temperature, or token limits.
-Keep Gemini secrets in `login/.env` for local Docker or `.env.production` / `GOOGLE_API_KEY_FILE` for production.
-
-If `login/setting/config.json` still contains `llm.gemini.api_key`, move that value to `GOOGLE_API_KEY` and clear the JSON field.
+Add optional Gemini tuning directly to `login/.env` when you want local overrides.
 
 For lower-cost LLM usage, prefer settings like:
-```json
-{
-  "llm": {
-    "gemini": {
-      "model": "gemini-2.5-flash-preview-04-17",
-      "thinking_level": "MINIMAL",
-      "max_output_tokens": 512
-    }
-  }
+```env
+CRAWLA_GEMINI_MODEL=gemini-2.5-flash-preview-04-17
+CRAWLA_GEMINI_TEMPERATURE=0.7
+CRAWLA_GEMINI_MAX_OUTPUT_TOKENS=512
+CRAWLA_GEMINI_THINKING_LEVEL=MINIMAL
 }
 ```
 
@@ -306,26 +289,14 @@ Production Docker now ships with a minimal Gunicorn profile through `gunicorn.co
 
 The recommended production path is now `CRAWLA_MONGO_URI` in `.env.production`.
 
-Legacy `config.json` Atlas settings still work:
+Example:
 
-```json
-{
-  "mongo_mode": "atlas",
-  "atlas_host": "cluster.mongodb.net",
-  "atlas_db": "crawla",
-  "atlas_user": "username",
-  "atlas_pw": "encrypted_password"
-}
+```env
+CRAWLA_MONGO_URI=mongodb+srv://username:password@cluster.mongodb.net/crawla?retryWrites=true&w=majority
+CRAWLA_MONGO_DB=crawla
 ```
 
-If you keep using `config.json`, legacy Atlas passwords must still be encrypted. Inside the Docker container:
-```bash
-docker exec -it crawla_web bash
-python key_generator.py
-python encrypt_token.py
-```
-
-For simpler production secrets, prefer environment variables or `*_FILE` secrets instead of encrypted values inside `config.json`. At this point, `config.json` should be treated as a legacy fallback for non-sensitive defaults only.
+If you use hosted Redis, mail, or Gemini in production, keep following the same env-first pattern with `CRAWLA_REDIS_URL`, `CRAWLA_MAIL_*`, `GOOGLE_API_KEY`, or the matching `*_FILE` variants.
 
 ## Architecture
 
