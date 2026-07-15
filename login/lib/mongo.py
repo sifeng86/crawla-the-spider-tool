@@ -31,10 +31,10 @@ class mongoHelper:
 
         app_env = os.environ.get("APP_ENV", "local")
         mongo_uri = get_secret_setting('CRAWLA_MONGO_URI')
-        mongo_mode = str(get_setting('CRAWLA_MONGO_MODE', config_path='mongo_mode', default='local')).lower()
+        mongo_mode = str(get_setting('CRAWLA_MONGO_MODE', default='local')).lower()
 
         if mongo_uri:
-            default_db = str(get_setting('CRAWLA_MONGO_DB', config_path='mongo_db', default='crawla'))
+            default_db = str(get_setting('CRAWLA_MONGO_DB', default='crawla'))
             _client = MongoClient(
                 mongo_uri,
                 maxPoolSize=10,
@@ -45,10 +45,10 @@ class mongoHelper:
             )
             _db = _client.get_default_database(default=default_db)
         elif app_env != 'local' and mongo_mode == 'atlas':
-            atlas_host = get_setting('CRAWLA_ATLAS_HOST', config_path='atlas_host')
-            atlas_db = get_setting('CRAWLA_ATLAS_DB', config_path='atlas_db')
-            atlas_user = get_setting('CRAWLA_ATLAS_USER', config_path='atlas_user')
-            atlas_pw = get_secret_setting('CRAWLA_ATLAS_PASSWORD', config_path='atlas_pw', decrypt_legacy=True)
+            atlas_host = get_setting('CRAWLA_ATLAS_HOST')
+            atlas_db = get_setting('CRAWLA_ATLAS_DB')
+            atlas_user = get_setting('CRAWLA_ATLAS_USER')
+            atlas_pw = get_secret_setting('CRAWLA_ATLAS_PASSWORD')
             require_settings(
                 (
                     ('CRAWLA_ATLAS_HOST', atlas_host),
@@ -76,7 +76,7 @@ class mongoHelper:
             )
             _db = _client[str(atlas_db)]
         else:
-            mongo_db = str(get_setting('CRAWLA_MONGO_DB', config_path='mongo_db', default='crawla'))
+            mongo_db = str(get_setting('CRAWLA_MONGO_DB', default='crawla'))
             _client = MongoClient(
                 'mongo',
                 27017,

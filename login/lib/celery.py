@@ -29,7 +29,7 @@ class celeryHelper:
 
         app_env = os.environ.get("APP_ENV", "local")
         redis_url = get_secret_setting('CRAWLA_REDIS_URL')
-        redis_host_port = str(get_setting('CRAWLA_REDIS_HOST_PORT', config_path='redis_host_port', default='local'))
+        redis_host_port = str(get_setting('CRAWLA_REDIS_HOST_PORT', default='local'))
 
         if redis_url:
             broker = redis_url
@@ -38,7 +38,7 @@ class celeryHelper:
             broker = 'redis://redis:6379/0'
             backend = 'redis://redis:6379/0'
         else:
-            redis_pw = get_secret_setting('CRAWLA_REDIS_PASSWORD', config_path='redis_pw', decrypt_legacy=True)
+            redis_pw = get_secret_setting('CRAWLA_REDIS_PASSWORD')
             require_settings(
                 (
                     ('CRAWLA_REDIS_HOST_PORT', redis_host_port),

@@ -28,15 +28,15 @@ else:
     exit('bad command')
 
 
-mail_host = get_setting('CRAWLA_MAIL_HOST', config_path='mail_host')
-mail_port = get_int_setting('CRAWLA_MAIL_PORT', config_path='mail_port', default=465)
-mail_sender = get_setting('CRAWLA_MAIL_SENDER', config_path='mail_sender')
-mail_user = get_setting('CRAWLA_MAIL_USER', config_path='mail_user')
-mail_password = get_secret_setting('CRAWLA_MAIL_PASSWORD', config_path='mail_pw', decrypt_legacy=True)
-host_url = get_setting('CRAWLA_HOST_URL', config_path='host_url')
+mail_host = get_setting('CRAWLA_MAIL_HOST')
+mail_port = get_int_setting('CRAWLA_MAIL_PORT', default=465)
+mail_sender = get_setting('CRAWLA_MAIL_SENDER')
+mail_user = get_setting('CRAWLA_MAIL_USER')
+mail_password = get_secret_setting('CRAWLA_MAIL_PASSWORD')
+host_url = get_setting('CRAWLA_HOST_URL')
 
 if not mail_host:
-    print("Email not configured (mail_host missing). Set CRAWLA_MAIL_HOST or keep the legacy config.json fallback.")
+    print("Email not configured (mail_host missing). Set CRAWLA_MAIL_HOST.")
     sys.exit(0)
 
 try:
@@ -49,10 +49,10 @@ except FileNotFoundError:
 
 for item in records:
     if not host_url:
-        print("Email not configured (host_url missing). Set CRAWLA_HOST_URL or keep the legacy config.json fallback.")
+        print("Email not configured (host_url missing). Set CRAWLA_HOST_URL.")
         sys.exit(0)
     if not all((mail_sender, mail_user, mail_password)):
-        print("Email not configured (sender, user, or password missing). Set CRAWLA_MAIL_* env vars or the legacy config.json fallback.")
+        print("Email not configured (sender, user, or password missing). Set CRAWLA_MAIL_* env vars.")
         sys.exit(0)
 
     dw_url = 'https://' + host_url + '/dw_csv/' + item['task_id']

@@ -117,8 +117,18 @@ class PackagingTests(unittest.TestCase):
         env_example = (ROOT / 'login' / '.env_example').read_text(encoding='utf-8')
 
         self.assertIn('set `GOOGLE_API_KEY=your-key` in `login/.env`', readme)
-        self.assertIn('Do not keep API keys in `config.json`', operating_guide)
-        self.assertIn('Keep API keys out of login/setting/config.json', env_example)
+        self.assertIn('CRAWLA_GEMINI_MODEL=gemini-2.5-flash-preview-04-17', readme)
+        self.assertIn('CRAWLA_GEMINI_MODEL', operating_guide)
+        self.assertIn('CRAWLA_GEMINI_MODEL=gemini-2.5-flash-preview-04-17', env_example)
+        self.assertNotIn('config_example.json', readme)
+        self.assertNotIn('config.json', readme)
+        self.assertNotIn('config.json', operating_guide)
+
+    def test_legacy_config_artifacts_are_removed(self):
+        self.assertFalse((ROOT / 'login' / 'setting' / 'config_example.json').exists())
+        self.assertFalse((ROOT / 'key_generator.py').exists())
+        self.assertFalse((ROOT / 'encrypt_token.py').exists())
+        self.assertFalse((ROOT / 'login' / 'lib' / 'cryptograpy.py').exists())
 
     def test_fontawesome_links_use_expected_sri(self):
         expected_integrity = 'sha384-wESLQ85D6gbsF459vf1CiZ2+rr+CsxRY0RpiF1tLlQpDnAgg6rwdsUF1+Ics2bni'

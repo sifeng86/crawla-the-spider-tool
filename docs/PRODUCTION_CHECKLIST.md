@@ -82,12 +82,24 @@ Only fill these if you want email notifications:
 docker compose --env-file .env.production -f docker-compose.production.yml up -d --build
 ```
 
+Remote host example:
+
+```bash
+ssh your-server
+cd ~/workspaces/crawla-the-spider-tool
+git pull --ff-only origin master
+docker compose --env-file .env.production -f docker-compose.production.yml up -d --build
+docker compose --env-file .env.production -f docker-compose.production.yml ps
+curl -I https://your-domain.com/login
+```
+
 Notes:
 
 * this compose file avoids the source bind mount from local development
 * MongoDB, Redis, and Chrome are only exposed inside the Docker network
 * web is bound to `127.0.0.1:${APP_PORT}` so you can place a reverse proxy in front
 * the production template starts the app with Gunicorn using conservative defaults
+* on ARM64 hosts, set `CRAWLA_SELENIUM_IMAGE=selenium/standalone-chromium:131.0` in `.env.production`
 
 ## 6.1 Gunicorn defaults
 

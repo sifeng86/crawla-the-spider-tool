@@ -25,22 +25,23 @@ class RuntimeConfigTests(unittest.TestCase):
         with patch.dict(os.environ, {'CRAWLA_MAIL_HOST': ''}, clear=True):
             with patch('login.lib.runtime_config.DOTENV_PATH', Path(dotenv_path)):
                 self.assertEqual(
-                    runtime_config.get_setting('CRAWLA_MAIL_HOST', config_path='mail_host'),
+                    runtime_config.get_setting('CRAWLA_MAIL_HOST'),
                     'smtp.dotenv.example',
                 )
 
-    def test_get_setting_without_config_path_does_not_return_entire_legacy_document(self):
-        with patch.dict(os.environ, {}, clear=False):
-            with patch('login.lib.runtime_config.load_legacy_config', return_value={'mail_host': 'smtp.config.example'}):
-                self.assertIsNone(runtime_config.get_setting('CRAWLA_MONGO_URI'))
+    def test_get_setting_returns_default_when_env_is_missing(self):
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(
+                runtime_config.get_setting('CRAWLA_MAIL_HOST', default='smtp.default.example'),
+                'smtp.default.example',
+            )
 
-    def test_get_setting_prefers_env_over_legacy_config(self):
-        with patch.dict(os.environ, {'CRAWLA_MAIL_HOST': 'smtp.env.example'}, clear=False):
-            with patch('login.lib.runtime_config.load_legacy_config', return_value={'mail_host': 'smtp.config.example'}):
-                self.assertEqual(
-                    runtime_config.get_setting('CRAWLA_MAIL_HOST', config_path='mail_host'),
-                    'smtp.env.example',
-                )
+    def test_get_setting_prefers_env_over_default(self):
+        with patch.dict(os.environ, {'CRAWLA_MAIL_HOST': 'smtp.env.example'}, clear=True):
+            self.assertEqual(
+                runtime_config.get_setting('CRAWLA_MAIL_HOST', default='smtp.default.example'),
+                'smtp.env.example',
+            )
 
     def test_get_secret_setting_reads_file_variant(self):
         with tempfile.NamedTemporaryFile('w+', delete=False) as handle:
@@ -63,39 +64,26 @@ class RuntimeConfigTests(unittest.TestCase):
             with patch('login.lib.runtime_config.DOTENV_PATH', Path(dotenv_path)):
                 self.assertEqual(runtime_config.get_secret_setting('GOOGLE_API_KEY'), 'dotenv-secret')
 
-    def test_get_secret_setting_without_config_path_does_not_return_entire_legacy_document(self):
-        with patch.dict(os.environ, {}, clear=False):
-            with patch('login.lib.runtime_config.load_legacy_config', return_value={'redis_pw': 'ciphertext'}):
-                self.assertIsNone(runtime_config.get_secret_setting('CRAWLA_MONGO_URI'))
+    def test_get_secret_setting_returns_default_when_missing(self):
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(
+                runtime_config.get_secret_setting('CRAWLA_MONGO_URI', default='mongodb://fallback'),
+                'mongodb://fallback',
+            )
 
-    def test_get_secret_setting_decrypts_legacy_config_when_needed(self):
-        with patch.dict(os.environ, {}, clear=False):
-            with patch('login.lib.runtime_config.load_legacy_config', return_value={'redis_pw': 'ciphertext'}):
-                with patch.object(runtime_config.crypto, 'decrypt_message', return_value='legacy-secret') as decrypt_message:
-                    self.assertEqual(
-                        runtime_config.get_secret_setting(
-                            'CRAWLA_REDIS_PASSWORD',
-                            config_path='redis_pw',
-                            decrypt_legacy=True,
-                        ),
-                        'legacy-secret',
-                    )
-                    decrypt_message.assert_called_once_with(b'ciphertext')
+    def test_get_int_setting_reads_env_value(self):
+        with patch.dict(os.environ, {'CRAWLA_GEMINI_MAX_OUTPUT_TOKENS': '256'}, clear=True):
+            self.assertEqual(
+                runtime_config.get_int_setting('CRAWLA_GEMINI_MAX_OUTPUT_TOKENS', default=512),
+                256,
+            )
 
-    def test_get_int_setting_supports_nested_config_paths(self):
-        with patch.dict(os.environ, {}, clear=False):
-            with patch(
-                'login.lib.runtime_config.load_legacy_config',
-                return_value={'llm': {'gemini': {'max_output_tokens': 256}}},
-            ):
-                self.assertEqual(
-                    runtime_config.get_int_setting(
-                        'CRAWLA_GEMINI_MAX_OUTPUT_TOKENS',
-                        config_path=('llm', 'gemini', 'max_output_tokens'),
-                        default=512,
-                    ),
-                    256,
-                )
+    def test_get_int_setting_falls_back_to_default_for_invalid_env(self):
+        with patch.dict(os.environ, {'CRAWLA_GEMINI_MAX_OUTPUT_TOKENS': 'not-a-number'}, clear=True):
+            self.assertEqual(
+                runtime_config.get_int_setting('CRAWLA_GEMINI_MAX_OUTPUT_TOKENS', default=512),
+                512,
+            )
 
 
 if __name__ == '__main__':

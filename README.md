@@ -175,6 +175,27 @@ For Docker deployments, copy `.env.production.example` to `.env.production`, fil
 
 Each authenticated user sees only their own tasks, previews, and Studio saves.
 
+Remote host update/start flow:
+
+```bash
+ssh your-server
+cd ~/workspaces/crawla-the-spider-tool
+git pull --ff-only origin master
+docker compose --env-file .env.production -f docker-compose.production.yml up -d --build
+docker compose --env-file .env.production -f docker-compose.production.yml ps
+curl -I https://your-domain.com/login
+```
+
+Useful follow-up commands:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.production.yml logs -f crawla_web
+docker compose --env-file .env.production -f docker-compose.production.yml restart crawla_web
+docker compose --env-file .env.production -f docker-compose.production.yml down
+```
+
+If the remote host is ARM64, keep `CRAWLA_SELENIUM_IMAGE=selenium/standalone-chromium:131.0` in `.env.production`.
+
 See [docs/AUTH0_SETUP.md](docs/AUTH0_SETUP.md) for the complete setup flow.
 
 ## Extraction Methods

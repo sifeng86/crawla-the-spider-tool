@@ -10,7 +10,7 @@ from typing import Optional, Dict, Any
 from threading import Lock
 from bs4 import BeautifulSoup
 
-from .runtime_config import get_float_setting, get_int_setting, get_secret_setting, get_setting, load_legacy_config
+from .runtime_config import get_float_setting, get_int_setting, get_secret_setting, get_setting
 
 
 # In-memory LLM response cache
@@ -154,14 +154,6 @@ def clean_webpage_content(content: str) -> str:
     return text
 
 
-def load_config() -> Dict[str, Any]:
-    """
-    Loads legacy fallback configuration from config.json.
-    Returns empty dict if file is missing; env vars remain the preferred source.
-    """
-    return load_legacy_config()
-
-
 def get_cache_key(prompt: str, content: str) -> str:
     """
     Generate a cache key from prompt and content.
@@ -238,19 +230,15 @@ def get_gemini_response(prompt: str, webpage_content: Optional[str] = None) -> s
         
         print("[LLM Cache] Miss - calling Gemini API")
         
-        config = load_config()
-        llm_config = config.get("llm", {}).get("gemini", {})
-
-        api_key = get_secret_setting('GOOGLE_API_KEY', config_path=('llm', 'gemini', 'api_key'))
+        api_key = get_secret_setting('GOOGLE_API_KEY')
         if not api_key:
-            raise ValueError("Google API key not configured. Set GOOGLE_API_KEY or GOOGLE_API_KEY_FILE. llm.gemini.api_key in config.json is legacy fallback only.")
+            raise ValueError("Google API key not configured. Set GOOGLE_API_KEY or GOOGLE_API_KEY_FILE.")
 
         llm_config = {
-            **llm_config,
-            'model': get_setting('CRAWLA_GEMINI_MODEL', config_path=('llm', 'gemini', 'model'), default='gemini-2.0-flash'),
-            'temperature': get_float_setting('CRAWLA_GEMINI_TEMPERATURE', config_path=('llm', 'gemini', 'temperature'), default=0.1),
-            'max_output_tokens': get_int_setting('CRAWLA_GEMINI_MAX_OUTPUT_TOKENS', config_path=('llm', 'gemini', 'max_output_tokens'), default=2048),
-            'thinking_level': get_setting('CRAWLA_GEMINI_THINKING_LEVEL', config_path=('llm', 'gemini', 'thinking_level'), default=DEFAULT_THINKING_LEVEL),
+            'model': get_setting('CRAWLA_GEMINI_MODEL', default='gemini-2.0-flash'),
+            'temperature': get_float_setting('CRAWLA_GEMINI_TEMPERATURE', default=0.1),
+            'max_output_tokens': get_int_setting('CRAWLA_GEMINI_MAX_OUTPUT_TOKENS', default=2048),
+            'thinking_level': get_setting('CRAWLA_GEMINI_THINKING_LEVEL', default=DEFAULT_THINKING_LEVEL),
         }
         model = llm_config.get("model", "gemini-2.0-flash")
         
